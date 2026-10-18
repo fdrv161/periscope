@@ -950,7 +950,9 @@ void TonalBalanceLens::fileDragExit  (const juce::StringArray&)          { dragO
 // integrated loudness, and the difference between them. Where no comparison is possible, the row says why.
 namespace
 {
-enum TbGroup { tbSummary = 0, tbBands, tbActions };
+// Periscope: the comparison group sits right after the summary, where the user looks first.
+enum TbGroup { tbSummary = 0, tbCompare, tbBands, tbActions };
+enum TbCompareRow { cmpLoudness = 0, cmpRange, cmpPlr, cmpTruePeak, kNumCompareRows };
 enum TbSummaryRow { rowState = 0, rowReference, rowSection, kSummaryFixedRows };
 enum TbActionRow { actReset = 0, actLoad, actClear, actSectionStart, actSectionEnd, actWholeFile, kNumActions };
 }
@@ -960,6 +962,7 @@ juce::String TonalBalanceLens::a11yGroupName (int group) const
     switch (group)
     {
         case tbSummary: return a11ytext::T ("Summary");
+        case tbCompare: return a11ytext::T ("Comparison with the reference");
         case tbBands:   return a11ytext::T ("Third-octave bands");
         default:        return a11ytext::T ("Actions");
     }
@@ -970,6 +973,7 @@ int TonalBalanceLens::a11yRowCount (int group) const
     switch (group)
     {
         case tbSummary: return kSummaryFixedRows + kA11yDiffs;
+        case tbCompare: return kNumCompareRows;
         case tbBands:   return ReferenceFrame::kNumBands;
         default:        return kNumActions;
     }
@@ -978,6 +982,16 @@ int TonalBalanceLens::a11yRowCount (int group) const
 juce::String TonalBalanceLens::a11yRowName (int group, int row) const
 {
     if (group == tbBands) return spoken::hz (kThirdOctaveHz[juce::jlimit (0, ReferenceFrame::kNumBands - 1, row)]);
+    if (group == tbCompare)
+    {
+        switch (row)
+        {
+            case cmpLoudness: return a11ytext::T ("Loudness");
+            case cmpRange:    return a11ytext::T ("Loudness range");
+            case cmpPlr:      return a11ytext::T ("PLR");
+            default:          return a11ytext::T ("True peak max");
+        }
+    }
     if (group == tbActions)
     {
         switch (row)
@@ -1010,6 +1024,7 @@ juce::String TonalBalanceLens::a11yRowValue (int group, int row) const
         return spoken::duration (row == actSectionStart ? from : to);
     }
     if (group == tbBands) return a11yBandValue (juce::jlimit (0, ReferenceFrame::kNumBands - 1, row));
+    if (group == tbCompare) return a11yCompareValue (row);
 
     switch (row)
     {
@@ -1037,6 +1052,77 @@ juce::String TonalBalanceLens::a11yRowValue (int group, int row) const
     const float d = data.deltaDb[b];
     return spoken::hz (kThirdOctaveHz[b]) + ", " + spoken::trimmed (std::abs (d), 1) + a11ytext::T (" dB ")
          + (d >= 0.0f ? a11ytext::T ("louder") : a11ytext::T ("quieter")) + a11ytext::T (" than the reference");
+}
+
+// Periscope: help for the comparison rows (F1).
+juce::String TonalBalanceLens::a11yRowHelp (int group, int) const
+{
+    if (group != tbCompare) return {};
+    // One literal: the key collector (_scripts/collect_keys.py) takes each literal of a T() call on its own.
+    return a11ytext::T ("Your mix against the reference, in the units of the Loudness and Dynamics lenses. Your mix counts from the last reset (Reset averaging here, or Reset in Loudness), the reference is the whole file or its section. The Loudness row says how much to turn the reference down or up so that both play equally loud.");
+}
+
+const TonalBalanceLens::RefLoudness& TonalBalanceLens::a11yRefLoudness() const
+{
+    const auto rev = processor.referenceRevision();
+    if (! refLoudnessRead || rev != refLoudnessRevision)
+    {
+        const auto a = processor.referenceAnalysis();
+        refLoudness = {};
+        refLoudness.valid      = a.valid && a.integratedLufs > kSilenceDb + 1.0f;
+        refLoudness.integrated = a.integratedLufs;
+        refLoudness.lra        = a.lra;
+        refLoudness.truePeak   = a.truePeakDbtp;
+        refLoudnessRevision = rev;
+        refLoudnessRead = true;
+    }
+    return refLoudness;
+}
+
+// Periscope: one comparison row. The reference comes from its file analysis (same meter as live, so the numbers
+// compare directly); the mix from the live loudness meter, which always runs.
+juce::String TonalBalanceLens::a11yCompareValue (int row) const
+{
+    if (! data.refValid) return a11ytext::T ("no reference loaded");
+    const auto& ref = a11yRefLoudness();
+    if (! ref.valid) return a11ytext::T ("no reference loaded");
+
+    const auto live = processor.analysis().read().loudness;   // a copy: read() is only valid until the next read
+    const auto both = [] (const juce::String& mine, const juce::String& theirs)
+    {
+        return a11ytext::TF ("your mix {0}, reference {1}", { mine, theirs });
+    };
+    const auto lufs = [] (float v) { return spoken::trimmed (v, 1) + a11ytext::T (" LUFS"); };
+
+    switch (row)
+    {
+        case cmpLoudness:
+        {
+            if (! live.integratedValid) return a11ytext::T ("play your mix to measure it") + ", " + a11ytext::TF ("reference {0}", { lufs (ref.integrated) });
+            // How far the reference's fader has to move so that both play equally loud.
+            const float d = ref.integrated - live.integrated;
+            const auto amount = spoken::dB (std::abs (d), 1);
+            juce::String advice;
+            if (std::abs (d) < 0.1f) advice = a11ytext::T ("same loudness");
+            else if (d > 0.0f)       advice = a11ytext::TF ("reference louder by {0}, turn it down by {0}", { amount });
+            else                     advice = a11ytext::TF ("reference quieter by {0}, turn it up by {0}", { amount });
+            return advice + "; " + both (lufs (live.integrated), lufs (ref.integrated));
+        }
+        case cmpRange:
+            if (! live.integratedValid) return a11ytext::T ("play your mix to measure it");
+            return both (spoken::trimmed (live.lra, 1) + a11ytext::T (" LU"), spoken::trimmed (ref.lra, 1) + a11ytext::T (" LU"));
+        case cmpPlr:
+        {
+            if (! live.plrValid) return a11ytext::T ("play your mix to measure it");
+            return both (spoken::dB (live.plr, 1), spoken::dB (ref.truePeak - ref.integrated, 1));
+        }
+        default:
+        {
+            if (live.truePeakMax <= kSilenceDb + 1.0f) return a11ytext::T ("play your mix to measure it");
+            const auto dbtp = [] (float v) { return spoken::trimmed (v, 1) + a11ytext::T (" dBTP"); };
+            return both (dbtp (live.truePeakMax), dbtp (ref.truePeak));
+        }
+    }
 }
 
 juce::String TonalBalanceLens::a11yBandValue (int b) const

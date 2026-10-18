@@ -525,6 +525,9 @@ Para números por banda de tercio de octava, usá Correlación por banda.
   - **Referencia**: el nombre del archivo de referencia, o "ninguno".
   - **Tramo de la referencia**: la parte de la referencia que se usa, o "archivo completo".
   - **Mayor diferencia 1 a 5**: las bandas donde tu programa más se aparta de la referencia, por ejemplo "125 Hz, 3.2 dB más fuerte que la referencia".
+- **Comparación con la referencia**: tu mezcla frente a la referencia, en las mismas unidades que las lentes Loudness y Dinámica. Tu mezcla cuenta desde el último reinicio; la referencia es el archivo entero o su tramo.
+  - **Loudness**: cuánto bajar o subir la referencia para que las dos suenen igual de fuerte, y después el integrado de cada una. Por ejemplo: "la referencia suena 2.6 dB más fuerte, bajala 2.6 dB; tu mezcla -12.4 LUFS, referencia -9.8 LUFS". Mové el fader de la pista de referencia esa cantidad y compará de oído a la misma sonoridad.
+  - **Loudness range**, **PLR** y **Máx true peak**: el tuyo y el de la referencia. Un PLR mucho menor que el de la referencia significa que tu mezcla está más comprimida.
 - **Bandas de tercio de octava**: cada una de las 30 bandas con el nivel del programa, el de la referencia y la diferencia.
 - **Acciones**:
   - **Reiniciar promedio**: vuelve a empezar el promedio del programa y conserva la referencia.

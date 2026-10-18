@@ -81,8 +81,10 @@ public:
     void pressControl (int control);
 
     // ================== ACCESSIBILITY (see Lens.h) ==================
-    // Groups: summary (state, reference, path, largest differences), third-octave bands, actions.
-    int          a11yGroupCount() const override { return 3; }
+    // Groups: summary (state, reference, path, largest differences), comparison with the reference (Periscope),
+    // third-octave bands, actions.
+    int          a11yGroupCount() const override { return 4; }
+    juce::String a11yRowHelp (int group, int row) const override;
     juce::String a11yGroupName (int group) const override;
     int          a11yRowCount (int group) const override;
     juce::String a11yRowName (int group, int row) const override;
@@ -182,6 +184,15 @@ private:
     // Accessibility
     static constexpr int kA11yDiffs = 5;          // how many of the largest differences to name
     juce::String a11yBandValue (int band) const;
+
+    // Periscope: the reference's loudness numbers for the comparison rows. referenceAnalysis() copies the whole
+    // FileAnalysis, so they are read again only when a new analysis is published.
+    struct RefLoudness { bool valid = false; float integrated = kSilenceDb, lra = 0.0f, truePeak = kSilenceDb; };
+    const RefLoudness& a11yRefLoudness() const;
+    juce::String       a11yCompareValue (int row) const;
+    mutable RefLoudness  refLoudness;
+    mutable juce::uint32 refLoudnessRevision = 0;
+    mutable bool         refLoudnessRead = false;
     std::vector<int> a11yLargestDiffs() const;    // bands sorted by absolute difference
 
     // Reference section from the keyboard. While the user steps with the arrows, new bounds are only stored

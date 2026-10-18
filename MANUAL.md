@@ -525,6 +525,9 @@ For numbers per third-octave band, use Band correlation.
   - **Reference**: the reference file name, or "none".
   - **Reference section**: the part of the reference being used, or "whole file".
   - **Largest difference 1 to 5**: the bands where your programme differs most from the reference, for example "125 Hz, 3.2 dB louder than the reference".
+- **Comparison with the reference**: your mix against the reference, in the same units as the Loudness and Dynamics lenses. Your mix counts from the last reset; the reference is the whole file or its section.
+  - **Loudness**: how much to turn the reference down or up so that both play equally loud, then both integrated values. For example: "reference louder by 2.6 dB, turn it down by 2.6 dB; your mix -12.4 LUFS, reference -9.8 LUFS". Set the reference track's fader by that amount and compare by ear at the same loudness.
+  - **Loudness range**, **PLR** and **True peak max**: yours and the reference's. A much smaller PLR than the reference's means your mix is more compressed.
 - **Third-octave bands**: each of the 30 bands with the programme level, the reference level and the difference.
 - **Actions**:
   - **Reset averaging**: restarts the programme's average and keeps the reference.
