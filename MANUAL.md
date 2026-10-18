@@ -257,13 +257,14 @@ Each lens below has two parts: what it measures and how to read it (from the aut
 
 **Changing the threshold restarts the count**, because a count measured against two different ceilings would mean nothing.
 
-The 8 dB line on screen is a reference, not a judgement. Judgements are Verdict's job, with the rule visible.
+The line on screen is your PSR target, 8 dB until you change it (see Actions below). It is a reference, not a judgement. Judgements are Verdict's job, with the rule visible.
 
 ### With the keyboard
 
-- **Readings**: PLR, PSR (with "low" when it is under the reference), Short-term, Most frequent short-term (the histogram's peak and how much of the time it held), Most of the time (where the middle 80 percent of the short-term readings lie, the width of the histogram, for example "-12 to -8 LUFS"), Clip events (count above the threshold), Clips in the last 10 minutes (and how long ago the latest one was).
+- **Readings**: PLR, PSR (with "low" under 4 dB, and "below target" under your PSR target, where the bar turns amber), Time below the PSR target (the share of the analysed time, up to the last 10 minutes, with PSR under the target, for example "35 percent of the time below 8 dB, over 2 minutes 10 seconds"; silent seconds are left out), Crest factor (sample peak over RMS since reset, with RMS counted the AES17 way so a sine reads 0 dB, as in dpMeter and most meters), Short-term, Most frequent short-term (the histogram's peak and how much of the time it held), Most of the time (where the middle 80 percent of the short-term readings lie, the width of the histogram, for example "-12 to -8 LUFS"), Clip events (count above the threshold), Clips in the last 10 minutes (and how long ago the latest one was).
 - **Actions**:
   - **Clip threshold**: plus and minus move it by 0.1 dB, a big step is 0.5 dB.
+  - **PSR target**: plus and minus move it by 0.5 dB, a big step is 1 dB, from 3 to 20 dB. Kept in the project. As a guide: about 12 to 14 dB for a mix, 7 to 8 for a loud master that still breathes, 5 to 6 for dance music.
   - **Pause** and **Reset**: Enter.
 
 ---
@@ -441,7 +442,7 @@ Note names follow the plugin language (letters, do-re-mi, or German with H and B
 
 ### With the keyboard
 
-- **Readings** (Directions only in Hemisphere mode, like the half circle it reads): Picture, Correlation (with a word for its meaning, such as "nearly mono" or "out of phase"), Width, Balance ("1.2 dB louder on the right", or "centred"), Mono loss, Out of phase energy (percent), Measured over (the window length), Directions: where the energy sits from left to right, as the filled half circle shows it, for example "centre: 10 percent right, spread from 40 percent left to 60 percent right, strongest at 80 percent right". Out-of-phase energy is not in it: it has its own row.
+- **Readings** (Directions only in Hemisphere mode, like the half circle it reads): Picture, Correlation history (the needle over the whole time since reset, up to 10 minutes, one value per second, recorded whatever lens is open: how long it was below zero, how long below 0.5, and the lowest value, for example "over 3 minutes 20 seconds: below zero 4 seconds, below 0.5 40 seconds, lowest -0.21"), Correlation (with a word for its meaning, such as "nearly mono" or "out of phase"), Width, Balance ("1.2 dB louder on the right", or "centred"), Mono loss, Out of phase energy (percent), Measured over (the window length), Directions: where the energy sits from left to right, as the filled half circle shows it, for example "centre: 10 percent right, spread from 40 percent left to 60 percent right, strongest at 80 percent right". Out-of-phase energy is not in it: it has its own row.
 - **Settings**: Mode (Lissajous, Polar, Hemisphere), Oscilloscope trigger (on, off), Window, Hemisphere decay (12, 24 or 48 dB per second) and Hemisphere scale (relative or decibels), these two only in Hemisphere mode, as on screen.
 
 The picture itself is not described in text: its meaning is these numbers.

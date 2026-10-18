@@ -257,13 +257,14 @@ Cada lente de abajo tiene dos partes: qué mide y cómo leerla (del manual del a
 
 **Cambiar el umbral reinicia el conteo**, porque un conteo medido contra dos techos distintos no significaría nada.
 
-La línea de 8 dB en pantalla es una referencia, no un juicio. Los juicios son trabajo de Veredicto, con la regla a la vista.
+La línea en pantalla es tu objetivo de PSR, 8 dB hasta que lo cambies (ver Acciones más abajo). Es una referencia, no un juicio. Los juicios son trabajo de Veredicto, con la regla a la vista.
 
 ### Con el teclado
 
-- **Lecturas**: PLR, PSR (con "bajo" cuando está por debajo de la referencia), Short-term, Short-term más frecuente (el pico del histograma y cuánto tiempo se mantuvo), La mayor parte del tiempo (dónde está el 80 por ciento central de las lecturas short-term, el ancho del histograma, por ejemplo "de -12 a -8 LUFS"), Clips (cantidad por encima del umbral), Clips en los últimos 10 minutos (y hace cuánto fue el último).
+- **Lecturas**: PLR, PSR (con "bajo" por debajo de 4 dB, y "bajo el objetivo" por debajo de tu objetivo de PSR, donde la barra se pone ámbar), Tiempo bajo el objetivo de PSR (la parte del tiempo analizado, hasta los últimos 10 minutos, con el PSR por debajo del objetivo, por ejemplo "35 por ciento del tiempo por debajo de 8 dB, en 2 minutos 10 segundos"; los segundos en silencio no cuentan), Factor de cresta (pico de muestra sobre RMS desde el reinicio, con el RMS contado según AES17, así un seno da 0 dB, como en dpMeter y la mayoría de los medidores), Short-term, Short-term más frecuente (el pico del histograma y cuánto tiempo se mantuvo), La mayor parte del tiempo (dónde está el 80 por ciento central de las lecturas short-term, el ancho del histograma, por ejemplo "de -12 a -8 LUFS"), Clips (cantidad por encima del umbral), Clips en los últimos 10 minutos (y hace cuánto fue el último).
 - **Acciones**:
   - **Umbral de clip**: más y menos lo mueven 0.1 dB, un paso grande es 0.5 dB.
+  - **Objetivo de PSR**: más y menos lo mueven 0.5 dB, un paso grande es 1 dB, de 3 a 20 dB. Se guarda en el proyecto. Como guía: unos 12 a 14 dB para una mezcla, 7 a 8 para un máster fuerte que todavía respira, 5 a 6 para música de baile.
   - **Pausa** y **Reiniciar**: Intro.
 
 ---
@@ -441,7 +442,7 @@ Los nombres de las notas siguen el idioma del plugin (letras, do-re-mi o el sist
 
 ### Con el teclado
 
-- **Lecturas** (Direcciones sólo en el modo Hemisferio, como el semicírculo que lee): Imagen, Correlación (con una palabra que dice lo que significa, como "casi mono" o "fuera de fase"), Ancho, Balance ("1.2 dB más fuerte a la derecha", o "centrado"), Pérdida mono, Energía fuera de fase (en por ciento), Medido sobre (el largo de la ventana), Direcciones: dónde está la energía de izquierda a derecha, como la muestra el semicírculo lleno, por ejemplo "centro: 10 por ciento a la derecha, repartido de 40 por ciento a la izquierda a 60 por ciento a la derecha, lo más fuerte en 80 por ciento a la derecha". La energía fuera de fase no está incluida: tiene su propia fila.
+- **Lecturas** (Direcciones sólo en el modo Hemisferio, como el semicírculo que lee): Imagen, Historial de correlación (la aguja en todo el tiempo desde el reinicio, hasta 10 minutos, un valor por segundo, grabado con cualquier lente abierta: cuánto estuvo por debajo de cero, cuánto por debajo de 0.5 y su valor mínimo, por ejemplo "en 3 minutos 20 segundos: bajo cero 4 segundos, bajo 0.5 40 segundos, mínimo -0.21"), Correlación (con una palabra que dice lo que significa, como "casi mono" o "fuera de fase"), Ancho, Balance ("1.2 dB más fuerte a la derecha", o "centrado"), Pérdida mono, Energía fuera de fase (en por ciento), Medido sobre (el largo de la ventana), Direcciones: dónde está la energía de izquierda a derecha, como la muestra el semicírculo lleno, por ejemplo "centro: 10 por ciento a la derecha, repartido de 40 por ciento a la izquierda a 60 por ciento a la derecha, lo más fuerte en 80 por ciento a la derecha". La energía fuera de fase no está incluida: tiene su propia fila.
 - **Ajustes**: Modo (Lissajous, Polar, Hemisferio), Trigger del osciloscopio (On, Off), Ventana, Caída del hemisferio (12, 24 o 48 dB por segundo) y Escala del hemisferio (Relativa o Decibelios), estas dos sólo en el modo Hemisferio, como en pantalla.
 
 La imagen en sí no se describe con texto: su significado son estos números.
