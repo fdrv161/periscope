@@ -178,9 +178,11 @@ void AnalysisThread::doReset()
     lastFieldEmitted = 0;
     fieldWasOn = false;
     if (clipHistory != nullptr) clipHistory->clear();
-    crestPeak = 0.0f; crestSum = 0.0; crestCount = 0.0;   // Periscope: crest factor since the reset
-    if (corrHistory != nullptr) corrHistory->clear();        // Periscope: correlation history since the reset
-    corrLL = corrRR = corrLR = 0.0; corrHops = 0;
+    // Periscope: crest factor and correlation history start again with the reset.
+    crestPeakL = crestPeakR = 0.0f;
+    crestSumL = crestSumR = crestCountL = crestCountR = 0.0;
+    if (corrHistory != nullptr) corrHistory->clear();
+    corrLL = corrRR = corrLR = 0.0; corrHops = 0; corrBadSecond = false;
     clipsThisSecond = 0;
     hopsThisSecond  = 0;
     lastEnabledMask = 0;   // todo queda "apagado": el próximo hop vuelve a limpiar las ventanas (idempotente)
@@ -365,39 +367,56 @@ void AnalysisThread::processHop()
         sumLR += (double) l * r;
     }
 
+    // Periscope: a hop with inf or NaN (a broken plugin earlier in the chain) must not poison the accumulators below,
+    // which keep their value until the next reset.
+    const bool finiteHop = std::isfinite (sumL + sumR + sumLR);
+
     // Periscope: one correlation value per second for CorrelationHistory, from the same sums. A second quieter
-    // than -70 dBFS RMS is stored as silent.
-    corrLL += sumL; corrRR += sumR; corrLR += sumLR;
+    // than -70 dBFS RMS, or with a non-finite hop, is stored as silent. One silent channel reads 0, as the Stereo
+    // module's needle does: that second is measured, and a dead channel is exactly what the history should show.
+    if (finiteHop) { corrLL += sumL; corrRR += sumR; corrLR += sumLR; }
+    else           corrBadSecond = true;
     if (++corrHops == 10)
     {
-        const double denom = std::sqrt (corrLL * corrRR);
-        const bool   silent = (corrLL + corrRR) / (2.0 * 10.0 * hopSamples) <= 1.0e-7 || denom <= 0.0;
+        const double denom  = std::sqrt (corrLL * corrRR);
+        const bool   silent = corrBadSecond || (corrLL + corrRR) / (2.0 * 10.0 * hopSamples) <= 1.0e-7;
+        const float  corr   = denom > 0.0 ? (float) juce::jlimit (-1.0, 1.0, corrLR / denom) : 0.0f;
         if (corrHistory != nullptr)
-            corrHistory->push (silent ? CorrelationHistory::kSilent : (float) juce::jlimit (-1.0, 1.0, corrLR / denom));
+            corrHistory->push (silent ? CorrelationHistory::kSilent : corr);
         corrLL = corrRR = corrLR = 0.0;
         corrHops = 0;
+        corrBadSecond = false;
     }
     f.peakL = peakL;
     f.peakR = peakR;
     f.rmsL  = (float) std::sqrt (sumL / (double) hopSamples);
     f.rmsR  = (float) std::sqrt (sumR / (double) hopSamples);
 
-    // Periscope: crest factor since the reset (see AnalysisFrame). Silent hops (RMS under -70 dBFS, 1e-7 in power)
-    // are skipped; the paused state skips whole chunks before they get here, as for every other number.
-    if ((sumL + sumR) / (2.0 * hopSamples) > 1.0e-7)
+    // Periscope: crest factor since the reset (see AnalysisFrame), per channel, as dpMeter and most meters count it:
+    // a sine in one channel only reads 0 dB too, which a shared RMS of both channels would put 3 dB higher. Silent
+    // hops of a channel (RMS under -70 dBFS, 1e-7 in power) are skipped; the paused state skips whole chunks before
+    // they get here, as for every other number. The louder crest of the two channels is reported.
+    if (finiteHop)
     {
-        crestPeak   = juce::jmax (crestPeak, juce::jmax (peakL, peakR));
-        crestSum   += sumL + sumR;
-        crestCount += 2.0 * hopSamples;
+        const double n = (double) hopSamples;
+        if (sumL / n > 1.0e-7) { crestPeakL = juce::jmax (crestPeakL, peakL); crestSumL += sumL; crestCountL += n; }
+        if (sumR / n > 1.0e-7) { crestPeakR = juce::jmax (crestPeakR, peakR); crestSumR += sumR; crestCountR += n; }
     }
-    if (crestCount > 0.0 && crestPeak > 0.0f)
     {
         // RMS is read the AES17 way, +3.01 dB, so a sine reads 0 dB of crest as in dpMeter and most meters (the plain
         // ratio would give a sine 3.01 dB), and full-scale sine RMS is 0 dB like its peak.
-        constexpr double kAes17RmsDb = 3.0103;
-        f.crestDb    = (float) (20.0 * std::log10 ((double) crestPeak)
-                                - (10.0 * std::log10 (crestSum / crestCount) + kAes17RmsDb));
-        f.crestValid = true;
+        const auto crestOf = [] (float peak, double sum, double count)
+        {
+            constexpr double kAes17RmsDb = 3.0103;
+            return (float) (20.0 * std::log10 ((double) peak) - (10.0 * std::log10 (sum / count) + kAes17RmsDb));
+        };
+        const bool okL = crestCountL > 0.0 && crestPeakL > 0.0f, okR = crestCountR > 0.0 && crestPeakR > 0.0f;
+        if (okL || okR)
+        {
+            f.crestDb = okL && okR ? juce::jmax (crestOf (crestPeakL, crestSumL, crestCountL), crestOf (crestPeakR, crestSumR, crestCountR))
+                                   : (okL ? crestOf (crestPeakL, crestSumL, crestCountL) : crestOf (crestPeakR, crestSumR, crestCountR));
+            f.crestValid = true;
+        }
     }
 
     // FLANCO DE SUBIDA de cada módulo con VENTANA DESLIZANTE: al reactivarse hay que limpiarle el ring.

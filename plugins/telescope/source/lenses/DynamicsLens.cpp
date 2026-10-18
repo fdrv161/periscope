@@ -557,12 +557,13 @@ bool DynamicsLens::a11yIsAdjustable (int group, int row) const
 // Periscope: the share of the analysed seconds (at most the last 10 minutes) whose PSR was under the target. PSR per
 // second is the highest true peak of that second and the two before it minus the second's highest short-term
 // loudness: the same 3 s rule as the live PSR, taken from the per-second history the engine keeps whatever lens
-// is open. Silent seconds are left out. Recomputed at most once a second: the copy is about 200 KB.
+// is open. Silent seconds are left out. Recomputed at most four times a second: the copy is about 250 KB.
 juce::String DynamicsLens::a11yBelowTarget() const
 {
     const auto now = juce::Time::getMillisecondCounter();
     const float target = processor.psrTargetDb();
-    if (belowCacheValid && now - belowCacheMs < 1000 && belowCacheTarget == target) return belowCacheText;
+    // 250 ms, not a second, so a Reset followed by F5 does not read the old share (review after 1.2.0).
+    if (belowCacheValid && now - belowCacheMs < 250 && belowCacheTarget == target) return belowCacheText;
 
     processor.secondHistory().copyLatest (secondsBuf, SecondHistory::kCapacity);
     int measured = 0, below = 0;

@@ -72,10 +72,6 @@ struct AnalysisFrame
     float plr         = 0.0f;         // dB · TP máx desde el reset - integrado (AES TD1004)
     bool  psrValid    = false;
     bool  plrValid    = false;
-    // Periscope: the classic crest factor since the reset, sample peak over AES17 RMS (sine = 0 dB) of both channels. Hops
-    // quieter than -70 dBFS RMS are left out, so pauses in the music do not inflate it.
-    float crestDb     = 0.0f;
-    bool  crestValid  = false;
     juce::uint32 clipEvents = 0;      // eventos de clip desde el reset, sobre el umbral vigente
     juce::uint32 histogram[61] = {};  // short-term por bin de 1 LU; el bin i está centrado en (i-60) LUFS.
                                       // F4 (T4): sólo los que pasan la compuerta de −70 LUFS (histogramGated)
@@ -129,5 +125,11 @@ struct AnalysisFrame
     float truePeakMaxL = kSilenceDb, truePeakMaxR = kSilenceDb;   // dBTP desde el reset, por canal
     float momentaryPartial = kSilenceDb;   // LUFS sobre la ventana de 400 ms INCOMPLETA
     float shortTermPartial = kSilenceDb;   // LUFS sobre la ventana de 3 s INCOMPLETA
+
+    // Periscope: the classic crest factor since the reset, sample peak over AES17 RMS (a sine reads 0 dB), the louder
+    // of the two channels. Hops quieter than -70 dBFS RMS are left out, so pauses do not inflate it. At the end of
+    // the struct, as the header asks.
+    float crestDb    = 0.0f;
+    bool  crestValid = false;
 };
 }

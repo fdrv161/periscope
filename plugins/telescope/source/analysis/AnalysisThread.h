@@ -144,12 +144,13 @@ private:
     int    hopSamples = 4800;          // 100 ms
     double analysedSeconds = 0.0;
     // Periscope: crest factor accumulators since the reset (worker thread only; cleared in doReset).
-    float  crestPeak = 0.0f;
-    double crestSum = 0.0, crestCount = 0.0;
+    float  crestPeakL = 0.0f, crestPeakR = 0.0f;
+    double crestSumL = 0.0, crestSumR = 0.0, crestCountL = 0.0, crestCountR = 0.0;
     // Periscope: the second being summed for the correlation history (ten hops make one second).
     CorrelationHistory* corrHistory = nullptr;
     double corrLL = 0.0, corrRR = 0.0, corrLR = 0.0;
     int    corrHops = 0;
+    bool   corrBadSecond = false;   // a non-finite hop in this second: store it as silent
 
     std::vector<float> chunkL, chunkR;   // lo que se saca del bus de una
     std::vector<float> hopL, hopR;       // el hop que se está llenando

@@ -51,6 +51,11 @@ TelescopeProcessor::TelescopeProcessor()
       stereoRing (std::make_unique<StereoSpectrogramRing>()),
       cqtFrames (std::make_unique<TripleBuffer<CqtFrame>>())
 {
+    // Periscope (review after 1.2.0): the engine's outputs are wired once, here, before the worker can run. They
+    // used to be set again in syncLensSettings, which also runs on state restore while the worker reads them.
+    analysisThread.setReferenceOutput (&refFrames);
+    analysisThread.setSecondHistory (&seconds);
+    analysisThread.setCorrelationHistory (&corrSeconds);
     syncLensSettings();
 }
 
@@ -276,9 +281,6 @@ void TelescopeProcessor::syncLensSettings()
     setCqtSettings (cqtSettings());             // (va DESPUÉS: lee holdDecay de los del espectro)
 
     // ===== 54: TONAL BALANCE · engancha la salida y RE-ANALIZA la referencia del estado =====
-    analysisThread.setReferenceOutput (&refFrames);
-    analysisThread.setSecondHistory (&seconds);   // ===== 55 =====
-    analysisThread.setCorrelationHistory (&corrSeconds);   // Periscope
     syncReference (true);   // Periscope: an undo or a preset does not re-analyse the same file
 
     // ===== 55: VERDICT =====
