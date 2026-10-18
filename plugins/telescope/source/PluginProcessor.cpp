@@ -90,6 +90,18 @@ void TelescopeProcessor::setClipThresholdDbtp (float dbtp)
     analysisThread.setClipThresholdDbtp (v);
 }
 
+float TelescopeProcessor::psrTargetDb() const
+{
+    const auto v = (float) (double) apvts.state.getProperty (kPsrTarget, (double) kDefaultPsrTargetDb);
+    if (! std::isfinite (v)) return kDefaultPsrTargetDb;   // see clipThresholdDbtp
+    return juce::jlimit (kMinPsrTargetDb, kMaxPsrTargetDb, v);
+}
+
+void TelescopeProcessor::setPsrTargetDb (float db)
+{
+    apvts.state.setProperty (kPsrTarget, (double) juce::jlimit (kMinPsrTargetDb, kMaxPsrTargetDb, db), nullptr);
+}
+
 // La ventana del estéreo por banda (0.3 / 1 / 3 s) y la fila secundaria de BAND CORRELATION.
 int TelescopeProcessor::bandsWindowIndex() const
 {

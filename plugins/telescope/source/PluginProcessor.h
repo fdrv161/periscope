@@ -111,6 +111,13 @@ public:
     float clipThresholdDbtp() const;
     void  setClipThresholdDbtp (float dbtp);
 
+    // Periscope: the PSR target of the Dynamics lens, in dB (3 to 20, step 0.5, default 8, the reference the lens
+    // always drew). Kept in the project like the clip threshold. Display and speech only: the engine ignores it.
+    static constexpr const char* kPsrTarget = "psrTargetDb";
+    static constexpr float kMinPsrTargetDb = 3.0f, kMaxPsrTargetDb = 20.0f, kDefaultPsrTargetDb = 8.0f;
+    float psrTargetDb() const;
+    void  setPsrTargetDb (float db);
+
     int   bandsWindowIndex() const;
     void  setBandsWindowIndex (int i);
     float bandsWindowSec() const { return StereoBands::kWindowSecOptions[bandsWindowIndex()]; }

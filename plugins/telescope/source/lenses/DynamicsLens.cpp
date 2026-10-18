@@ -187,7 +187,7 @@ void DynamicsLens::paintHero (juce::Graphics& g) const
         // referencia dinámica del spec §5.8 está: alerta bien apretado, ámbar acercándose, verde con aire.
         // Sigue siendo REFERENCIA y no veredicto — el número no se colorea, se colorea la barra.
         const auto zone = dispPsr < kPsrAlert  ? look::alert
-                        : dispPsr < kPsrReference ? look::caution
+                        : dispPsr < processor.psrTargetDb() ? look::caution   // Periscope: the user's target
                                                   : look::dataLine;
         g.setGradientFill (juce::ColourGradient (zone.withAlpha (0.45f), (float) bar.getX(), 0.0f,
                                                  zone.withAlpha (0.92f),
@@ -203,13 +203,15 @@ void DynamicsLens::paintHero (juce::Graphics& g) const
     }
 
     // REFERENCIA, no veredicto: la línea del spec §5.8 dibujada y ROTULADA, sin colorear el número.
-    const float rt = (kPsrReference - kPsrMin) / (kPsrMax - kPsrMin);
+    // Periscope: the line is the user's PSR target (8 dB until changed), so the picture shows the target the speech uses.
+    const float target = processor.psrTargetDb();
+    const float rt = (target - kPsrMin) / (kPsrMax - kPsrMin);
     const int   rx = bar.getX() + juce::roundToInt (rt * (float) bar.getWidth());
     g.setColour (th::amber.withAlpha (0.85f));
     look::fillSnapped (g, { (float) (rx), (float) (bar.getY() - 3), 1.0f, (float) (bar.getHeight() + 6) });
     g.setFont (look::label (9.5f));
     g.setColour (th::amber.withAlpha (0.9f));
-    g.drawText (tr (strings::Key::dynamicRefShort) + juce::String (kPsrReference, 0) + " dB", rx - 60, bar.getBottom() + 5, 130, 12,
+    g.drawText (tr (strings::Key::dynamicRefShort) + spoken::trimmed (target, 1) + " dB", rx - 60, bar.getBottom() + 5, 130, 12,
                 juce::Justification::centred, true);
 
     g.setColour (look::txtTertiary);
@@ -445,8 +447,9 @@ void DynamicsLens::mouseExit (const juce::MouseEvent&)
 // strip as a count over the last 10 minutes plus how long ago the last one was. The PSR warning colour is said as a word.
 namespace
 {
-enum DynRow { drPlr = 0, drPsr, drShortTerm, drMostFrequent, drMostOfTime, drClips, drRecentClips, kDynRows };
-enum DynAction { daThreshold = 0, daPause, daReset, kDynActions };
+// Periscope: drBelowTarget (how long PSR was under the target) and daPsrTarget (the target itself).
+enum DynRow { drPlr = 0, drPsr, drBelowTarget, drShortTerm, drMostFrequent, drMostOfTime, drClips, drRecentClips, kDynRows };
+enum DynAction { daThreshold = 0, daPsrTarget, daPause, daReset, kDynActions };
 }
 
 juce::String DynamicsLens::a11yGroupName (int group) const
@@ -463,10 +466,10 @@ juce::String DynamicsLens::a11yRowName (int group, int row) const
 {
     if (group == 1)
     {
-        static const char* const actions[kDynActions] = { "Clip threshold", "Pause", "Reset" };
+        static const char* const actions[kDynActions] = { "Clip threshold", "PSR target", "Pause", "Reset" };
         return a11ytext::T (actions[juce::jlimit (0, (int) kDynActions - 1, row)]);
     }
-    static const char* const names[kDynRows] = { "PLR", "PSR", "Short-term", "Most frequent short-term",
+    static const char* const names[kDynRows] = { "PLR", "PSR", "Time below the PSR target", "Short-term", "Most frequent short-term",
                                                  "Most of the time", "Clip events", "Clips in the last 10 minutes" };
     return a11ytext::T (names[juce::jlimit (0, (int) kDynRows - 1, row)]);
 }
@@ -476,6 +479,7 @@ juce::String DynamicsLens::a11yRowValue (int group, int row) const
     if (group == 1)
     {
         if (row == daThreshold) return spoken::trimmed (processor.clipThresholdDbtp(), 1) + a11ytext::T (" dBTP");
+        if (row == daPsrTarget) return spoken::dB (processor.psrTargetDb(), 1);
         if (row == daPause)     return processor.isAnalysisPaused() ? a11ytext::T ("paused") : a11ytext::T ("running");
         return {};
     }
@@ -485,7 +489,11 @@ juce::String DynamicsLens::a11yRowValue (int group, int row) const
         case drPlr: return plrValid ? spoken::trimmed (plr, 1) + a11ytext::T (" dB") : juce::String (a11ytext::T ("no reading yet"));
         case drPsr:
             if (! psrValid) return a11ytext::T ("no reading yet");
-            return spoken::trimmed (psr, 1) + a11ytext::T (" dB") + (psr < kPsrAlert ? a11ytext::T (", low") : "");
+            // Periscope: between the alert and the target the bar is amber; say it, as the colour shows it.
+            return spoken::trimmed (psr, 1) + a11ytext::T (" dB")
+                 + (psr < kPsrAlert ? a11ytext::T (", low")
+                                    : (psr < processor.psrTargetDb() ? a11ytext::T (", below target") : juce::String()));
+        case drBelowTarget: return a11yBelowTarget();
         case drShortTerm:
             return latest.shortTerm > -100.0f ? spoken::trimmed (latest.shortTerm, 1) + a11ytext::T (" LUFS") : juce::String (a11ytext::T ("no reading"));
         case drMostFrequent:
@@ -538,7 +546,40 @@ juce::String DynamicsLens::a11yRowValue (int group, int row) const
 
 bool DynamicsLens::a11yIsAdjustable (int group, int row) const
 {
-    return group == 1 && row == daThreshold;
+    return group == 1 && (row == daThreshold || row == daPsrTarget);
+}
+
+// Periscope: the share of the analysed seconds (at most the last 10 minutes) whose PSR was under the target. PSR per
+// second is the highest true peak of that second and the two before it minus the second's highest short-term
+// loudness: the same 3 s rule as the live PSR, taken from the per-second history the engine keeps whatever lens
+// is open. Silent seconds are left out. Recomputed at most once a second: the copy is about 200 KB.
+juce::String DynamicsLens::a11yBelowTarget() const
+{
+    const auto now = juce::Time::getMillisecondCounter();
+    const float target = processor.psrTargetDb();
+    if (belowCacheValid && now - belowCacheMs < 1000 && belowCacheTarget == target) return belowCacheText;
+
+    processor.secondHistory().copyLatest (secondsBuf, SecondHistory::kCapacity);
+    int measured = 0, below = 0;
+    for (int i = 0; i < (int) secondsBuf.size(); ++i)
+    {
+        const auto& r = secondsBuf[(size_t) i];
+        if (r.shortTermMax <= -70.0f) continue;
+        float peak = r.tpMaxDbtp;
+        for (int k = juce::jmax (0, i - 2); k < i; ++k) peak = juce::jmax (peak, secondsBuf[(size_t) k].tpMaxDbtp);
+        if (peak <= kSilenceDb + 1.0f) continue;
+        ++measured;
+        if (peak - r.shortTermMax < target) ++below;
+    }
+
+    juce::String t;
+    if (measured == 0) t = a11ytext::T ("no reading yet");
+    else
+        t = a11ytext::TF ("{0} of the time below {1}, over {2}",
+                          { spoken::percent (juce::roundToInt (100.0 * below / measured)), spoken::dB (target, 1),
+                            spoken::duration ((double) measured) });
+    belowCacheText = t; belowCacheMs = now; belowCacheTarget = target; belowCacheValid = true;
+    return t;
 }
 
 // Clip threshold: step 0.1 dB, coarse step 0.5 dB. The knob in the picture follows without its notification:
@@ -546,6 +587,18 @@ bool DynamicsLens::a11yIsAdjustable (int group, int row) const
 bool DynamicsLens::a11yAdjust (int group, int row, int step)
 {
     if (! a11yIsAdjustable (group, row)) return false;
+    if (row == daPsrTarget)
+    {
+        // Periscope: step 0.5 dB, coarse 1 dB, Alt+Home/End to the ends.
+        const float was  = processor.psrTargetDb();
+        const float size = std::abs (step) >= a11yui::kExtreme ? 100.0f : (std::abs (step) >= a11yui::kCoarse ? 1.0f : 0.5f);
+        const float next = juce::jlimit (TelescopeProcessor::kMinPsrTargetDb, TelescopeProcessor::kMaxPsrTargetDb,
+                                         std::round ((was + (step > 0 ? size : -size)) * 2.0f) / 2.0f);
+        if (std::abs (next - was) < 1.0e-4f) return false;
+        processor.setPsrTargetDb (next);
+        repaint();
+        return true;
+    }
     const float now = processor.clipThresholdDbtp();
     const float size = std::abs (step) >= a11yui::kExtreme ? 100.0f : (std::abs (step) >= a11yui::kCoarse ? 0.5f : 0.1f);
     const float next = juce::jlimit (Loudness::kMinClipThresholdDbtp, Loudness::kMaxClipThresholdDbtp,
@@ -559,7 +612,7 @@ bool DynamicsLens::a11yAdjust (int group, int row, int step)
 
 bool DynamicsLens::a11yIsActivatable (int group, int row) const
 {
-    return group == 1 && row != daThreshold;
+    return group == 1 && row != daThreshold && row != daPsrTarget;
 }
 
 juce::String DynamicsLens::a11yActivate (int group, int row)

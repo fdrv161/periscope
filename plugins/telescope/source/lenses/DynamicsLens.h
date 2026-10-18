@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include "analysis/History.h"
+#include "analysis/SecondHistory.h"   // Periscope: the time-below-the-PSR-target row
 #include "lenses/Lens.h"
 #include "ui-kit/KnobLookAndFeel.h"
 #include "ui-kit/OvniKnob.h"
@@ -65,10 +66,19 @@ protected:
 
 private:
     // Escala del héroe: 0…20 dB de PSR, con la referencia del spec §5.8 en 8 dB.
-    static constexpr float kPsrMin = 0.0f, kPsrMax = 20.0f, kPsrReference = 8.0f;
+    // Periscope: the 8 dB reference is now the user's PSR target (TelescopeProcessor::psrTargetDb, default 8).
+    static constexpr float kPsrMin = 0.0f, kPsrMax = 20.0f;
     // Histograma: 61 bins de 1 LU centrados en -60…0.
     static constexpr int   kBins = 61, kBinsFloorLufs = -60;
     static constexpr int   kTimelineSeconds = 10 * 60;   // los 10 min del ring de ClipHistory
+
+    // Periscope: the "time below the PSR target" row and its once-a-second cache (see the .cpp).
+    juce::String a11yBelowTarget() const;
+    mutable std::vector<SecondRow> secondsBuf;
+    mutable juce::String belowCacheText;
+    mutable juce::uint32 belowCacheMs = 0;
+    mutable float        belowCacheTarget = 0.0f;
+    mutable bool         belowCacheValid = false;
 
     struct Zones
     {
