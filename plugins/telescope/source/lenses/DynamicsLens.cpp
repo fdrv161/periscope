@@ -363,6 +363,8 @@ bool DynamicsLens::advanceFrame()
     plr        = f.plr;
     psrValid   = f.psrValid;
     plrValid   = f.plrValid;
+    crestDb    = f.crestDb;      // Periscope
+    crestValid = f.crestValid;
     clipEvents = f.clipEvents;
 
     histMax = 1;
@@ -447,8 +449,8 @@ void DynamicsLens::mouseExit (const juce::MouseEvent&)
 // strip as a count over the last 10 minutes plus how long ago the last one was. The PSR warning colour is said as a word.
 namespace
 {
-// Periscope: drBelowTarget (how long PSR was under the target) and daPsrTarget (the target itself).
-enum DynRow { drPlr = 0, drPsr, drBelowTarget, drShortTerm, drMostFrequent, drMostOfTime, drClips, drRecentClips, kDynRows };
+// Periscope: drBelowTarget (how long PSR was under the target), drCrest (classic crest factor) and daPsrTarget.
+enum DynRow { drPlr = 0, drPsr, drBelowTarget, drCrest, drShortTerm, drMostFrequent, drMostOfTime, drClips, drRecentClips, kDynRows };
 enum DynAction { daThreshold = 0, daPsrTarget, daPause, daReset, kDynActions };
 }
 
@@ -469,7 +471,7 @@ juce::String DynamicsLens::a11yRowName (int group, int row) const
         static const char* const actions[kDynActions] = { "Clip threshold", "PSR target", "Pause", "Reset" };
         return a11ytext::T (actions[juce::jlimit (0, (int) kDynActions - 1, row)]);
     }
-    static const char* const names[kDynRows] = { "PLR", "PSR", "Time below the PSR target", "Short-term", "Most frequent short-term",
+    static const char* const names[kDynRows] = { "PLR", "PSR", "Time below the PSR target", "Crest factor", "Short-term", "Most frequent short-term",
                                                  "Most of the time", "Clip events", "Clips in the last 10 minutes" };
     return a11ytext::T (names[juce::jlimit (0, (int) kDynRows - 1, row)]);
 }
@@ -494,6 +496,9 @@ juce::String DynamicsLens::a11yRowValue (int group, int row) const
                  + (psr < kPsrAlert ? a11ytext::T (", low")
                                     : (psr < processor.psrTargetDb() ? a11ytext::T (", below target") : juce::String()));
         case drBelowTarget: return a11yBelowTarget();
+        case drCrest:
+            // Sample peak over RMS since the reset: the older, simpler cousin of PLR (true peak over loudness).
+            return crestValid ? spoken::dB (crestDb, 1) : juce::String (a11ytext::T ("no reading yet"));
         case drShortTerm:
             return latest.shortTerm > -100.0f ? spoken::trimmed (latest.shortTerm, 1) + a11ytext::T (" LUFS") : juce::String (a11ytext::T ("no reading"));
         case drMostFrequent:

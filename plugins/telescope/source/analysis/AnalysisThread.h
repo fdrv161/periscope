@@ -142,6 +142,9 @@ private:
     double sr = 48000.0;
     int    hopSamples = 4800;          // 100 ms
     double analysedSeconds = 0.0;
+    // Periscope: crest factor accumulators since the reset (worker thread only; cleared in doReset).
+    float  crestPeak = 0.0f;
+    double crestSum = 0.0, crestCount = 0.0;
 
     std::vector<float> chunkL, chunkR;   // lo que se saca del bus de una
     std::vector<float> hopL, hopR;       // el hop que se está llenando

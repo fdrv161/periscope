@@ -178,6 +178,7 @@ void AnalysisThread::doReset()
     lastFieldEmitted = 0;
     fieldWasOn = false;
     if (clipHistory != nullptr) clipHistory->clear();
+    crestPeak = 0.0f; crestSum = 0.0; crestCount = 0.0;   // Periscope: crest factor since the reset
     clipsThisSecond = 0;
     hopsThisSecond  = 0;
     lastEnabledMask = 0;   // todo queda "apagado": el próximo hop vuelve a limpiar las ventanas (idempotente)
@@ -364,6 +365,20 @@ void AnalysisThread::processHop()
     f.peakR = peakR;
     f.rmsL  = (float) std::sqrt (sumL / (double) hopSamples);
     f.rmsR  = (float) std::sqrt (sumR / (double) hopSamples);
+
+    // Periscope: crest factor since the reset (see AnalysisFrame). Silent hops (RMS under -70 dBFS, 1e-7 in power)
+    // are skipped; the paused state skips whole chunks before they get here, as for every other number.
+    if ((sumL + sumR) / (2.0 * hopSamples) > 1.0e-7)
+    {
+        crestPeak   = juce::jmax (crestPeak, juce::jmax (peakL, peakR));
+        crestSum   += sumL + sumR;
+        crestCount += 2.0 * hopSamples;
+    }
+    if (crestCount > 0.0 && crestPeak > 0.0f)
+    {
+        f.crestDb    = (float) (20.0 * std::log10 ((double) crestPeak) - 10.0 * std::log10 (crestSum / crestCount));
+        f.crestValid = true;
+    }
 
     // FLANCO DE SUBIDA de cada módulo con VENTANA DESLIZANTE: al reactivarse hay que limpiarle el ring.
     // Si no, el primer número tras volver a la lente mezcla hasta un segundo de audio de ANTES de apagarse

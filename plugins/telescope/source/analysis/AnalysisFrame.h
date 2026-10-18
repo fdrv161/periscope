@@ -72,6 +72,10 @@ struct AnalysisFrame
     float plr         = 0.0f;         // dB · TP máx desde el reset - integrado (AES TD1004)
     bool  psrValid    = false;
     bool  plrValid    = false;
+    // Periscope: the classic crest factor since the reset, sample peak over RMS of both channels in dB. Hops
+    // quieter than -70 dBFS RMS are left out, so pauses in the music do not inflate it.
+    float crestDb     = 0.0f;
+    bool  crestValid  = false;
     juce::uint32 clipEvents = 0;      // eventos de clip desde el reset, sobre el umbral vigente
     juce::uint32 histogram[61] = {};  // short-term por bin de 1 LU; el bin i está centrado en (i-60) LUFS.
                                       // F4 (T4): sólo los que pasan la compuerta de −70 LUFS (histogramGated)

@@ -100,6 +100,8 @@ private:
     AnalysisFrame::Loudness latest {};
     float        psr = 0.0f, plr = 0.0f;
     bool         psrValid = false, plrValid = false;
+    float        crestDb = 0.0f;       // Periscope: classic crest factor since the reset
+    bool         crestValid = false;
     juce::uint32 clipEvents = 0;
     juce::uint32 histogram[kBins] {};
     juce::uint32 histMax = 1;
