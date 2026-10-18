@@ -72,7 +72,7 @@ struct AnalysisFrame
     float plr         = 0.0f;         // dB · TP máx desde el reset - integrado (AES TD1004)
     bool  psrValid    = false;
     bool  plrValid    = false;
-    // Periscope: the classic crest factor since the reset, sample peak over RMS of both channels in dB. Hops
+    // Periscope: the classic crest factor since the reset, sample peak over AES17 RMS (sine = 0 dB) of both channels. Hops
     // quieter than -70 dBFS RMS are left out, so pauses in the music do not inflate it.
     float crestDb     = 0.0f;
     bool  crestValid  = false;

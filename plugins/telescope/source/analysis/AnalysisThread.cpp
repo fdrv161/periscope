@@ -376,7 +376,11 @@ void AnalysisThread::processHop()
     }
     if (crestCount > 0.0 && crestPeak > 0.0f)
     {
-        f.crestDb    = (float) (20.0 * std::log10 ((double) crestPeak) - 10.0 * std::log10 (crestSum / crestCount));
+        // RMS is read the AES17 way, +3.01 dB, so a sine reads 0 dB of crest as in dpMeter and most meters (the plain
+        // ratio would give a sine 3.01 dB), and full-scale sine RMS is 0 dB like its peak.
+        constexpr double kAes17RmsDb = 3.0103;
+        f.crestDb    = (float) (20.0 * std::log10 ((double) crestPeak)
+                                - (10.0 * std::log10 (crestSum / crestCount) + kAes17RmsDb));
         f.crestValid = true;
     }
 
