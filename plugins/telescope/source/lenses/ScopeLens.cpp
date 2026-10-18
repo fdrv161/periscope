@@ -1082,7 +1082,8 @@ void ScopeLens::mouseExit (const juce::MouseEvent&)
 namespace
 {
 // Directions is last: it exists only in Hemisphere mode, like the half circle it reads.
-enum ScopeRow { srPicture = 0, srCorr, srWidth, srBalance, srMonoLoss, srOutOfPhase, srWindow, srDirections, kScopeRows };
+// Periscope: srCorrHistory, the long view of the needle, right after the 10-second picture.
+enum ScopeRow { srPicture = 0, srCorrHistory, srCorr, srWidth, srBalance, srMonoLoss, srOutOfPhase, srWindow, srDirections, kScopeRows };
 enum ScopeSet { ssMode = 0, ssTrigger, ssWindow, ssHemiDecay, ssHemiScale, kScopeSets };
 
 int windowIndexFor (int ms)
@@ -1113,7 +1114,7 @@ juce::String ScopeLens::a11yRowName (int group, int row) const
                                                       "Hemisphere decay", "Hemisphere scale" };
         return a11ytext::T (sets[juce::jlimit (0, (int) kScopeSets - 1, row)]);
     }
-    static const char* const names[kScopeRows] = { "Picture", "Correlation", "Width", "Balance", "Mono loss",
+    static const char* const names[kScopeRows] = { "Picture", "Correlation history", "Correlation", "Width", "Balance", "Mono loss",
                                                    "Out of phase energy", "Measured over", "Directions" };
     return a11ytext::T (names[juce::jlimit (0, (int) kScopeRows - 1, row)]);
 }
@@ -1137,6 +1138,7 @@ juce::String ScopeLens::a11yRowValue (int group, int row) const
     switch (row)
     {
         case srPicture:    return a11yPictureValue();
+        case srCorrHistory: return a11yCorrHistoryValue();
         case srDirections: return a11yDirectionsValue();
         case srCorr:       return spoken::correlation (corr);
         case srWidth:      return spoken::trimmed (width, 2);
@@ -1146,6 +1148,29 @@ juce::String ScopeLens::a11yRowValue (int group, int row) const
         case srWindow:     return juce::String (juce::roundToInt (windowSec * 1000.0f)) + a11ytext::T (" ms");
         default:           return {};
     }
+}
+
+// Periscope: the needle over the whole time since the reset (up to 10 minutes), one value per second from the engine,
+// as Metric AB's correlation history graph shows it: how long it was below zero (parts cancel in mono), how long
+// below 0.5 (wide), and the lowest second. Silent seconds are left out.
+juce::String ScopeLens::a11yCorrHistoryValue() const
+{
+    std::vector<float> secs;
+    processor.correlationHistory().copyLatest (secs, CorrelationHistory::kCapacity);
+    int measured = 0, belowZero = 0, belowHalf = 0;
+    float lowest = 1.0f;
+    for (auto c : secs)
+    {
+        if (c > 1.0f) continue;   // CorrelationHistory::kSilent
+        ++measured;
+        if (c < 0.0f) ++belowZero;
+        if (c < 0.5f) ++belowHalf;
+        lowest = juce::jmin (lowest, c);
+    }
+    if (measured == 0) return a11ytext::T ("no reading yet");
+    return a11ytext::TF ("over {0}: below zero {1}, below 0.5 {2}, lowest {3}",
+                         { spoken::duration ((double) measured), spoken::duration ((double) belowZero),
+                           spoken::duration ((double) belowHalf), spoken::trimmed (lowest, 2) });
 }
 
 // The picture in words, as a sighted user reads the goniometer and the correlation needle: a vertical line is mono,

@@ -179,6 +179,8 @@ void AnalysisThread::doReset()
     fieldWasOn = false;
     if (clipHistory != nullptr) clipHistory->clear();
     crestPeak = 0.0f; crestSum = 0.0; crestCount = 0.0;   // Periscope: crest factor since the reset
+    if (corrHistory != nullptr) corrHistory->clear();        // Periscope: correlation history since the reset
+    corrLL = corrRR = corrLR = 0.0; corrHops = 0;
     clipsThisSecond = 0;
     hopsThisSecond  = 0;
     lastEnabledMask = 0;   // todo queda "apagado": el próximo hop vuelve a limpiar las ventanas (idempotente)
@@ -352,7 +354,7 @@ void AnalysisThread::processHop()
     f.enabledModules  = enabledMask.load (std::memory_order_acquire);
 
     float peakL = 0.0f, peakR = 0.0f;
-    double sumL = 0.0, sumR = 0.0;
+    double sumL = 0.0, sumR = 0.0, sumLR = 0.0;
     for (int i = 0; i < hopSamples; ++i)
     {
         const float l = hopL[(size_t) i], r = hopR[(size_t) i];
@@ -360,6 +362,20 @@ void AnalysisThread::processHop()
         peakR = juce::jmax (peakR, std::abs (r));
         sumL += (double) l * l;
         sumR += (double) r * r;
+        sumLR += (double) l * r;
+    }
+
+    // Periscope: one correlation value per second for CorrelationHistory, from the same sums. A second quieter
+    // than -70 dBFS RMS is stored as silent.
+    corrLL += sumL; corrRR += sumR; corrLR += sumLR;
+    if (++corrHops == 10)
+    {
+        const double denom = std::sqrt (corrLL * corrRR);
+        const bool   silent = (corrLL + corrRR) / (2.0 * 10.0 * hopSamples) <= 1.0e-7 || denom <= 0.0;
+        if (corrHistory != nullptr)
+            corrHistory->push (silent ? CorrelationHistory::kSilent : (float) juce::jlimit (-1.0, 1.0, corrLR / denom));
+        corrLL = corrRR = corrLR = 0.0;
+        corrHops = 0;
     }
     f.peakL = peakL;
     f.peakR = peakR;

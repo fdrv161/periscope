@@ -113,6 +113,7 @@ public:
 
     // ===== 55: el ring de la historia por segundo (lente 13). Se engancha igual que el de arriba.
     void setSecondHistory (SecondHistory* p) noexcept { secondHistory = p; }
+    void setCorrelationHistory (CorrelationHistory* p) noexcept { corrHistory = p; }   // Periscope
 
     // La carga y el borrado los hace el message thread (el usuario soltó un archivo); adentro, el módulo
     // los protege con su propia CriticalSection. Ver analysis/modules/Reference.h.
@@ -145,6 +146,10 @@ private:
     // Periscope: crest factor accumulators since the reset (worker thread only; cleared in doReset).
     float  crestPeak = 0.0f;
     double crestSum = 0.0, crestCount = 0.0;
+    // Periscope: the second being summed for the correlation history (ten hops make one second).
+    CorrelationHistory* corrHistory = nullptr;
+    double corrLL = 0.0, corrRR = 0.0, corrLR = 0.0;
+    int    corrHops = 0;
 
     std::vector<float> chunkL, chunkR;   // lo que se saca del bus de una
     std::vector<float> hopL, hopR;       // el hop que se está llenando

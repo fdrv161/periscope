@@ -88,6 +88,7 @@ public:
     bool         a11yAdjust (int group, int row, int step) override;
     juce::String a11yPictureValue() const;   // the goniometer and the needle over 10 seconds, in words
     juce::String a11yDirectionsValue() const;   // Hemisphere mode: where the energy sits from left to right
+    juce::String a11yCorrHistoryValue() const;  // Periscope: per-second correlation over up to 10 minutes
 
     // ===== 56 =====
     // Los TRES modos del panel izquierdo. El índice persiste en el ValueTree como `scopeMode`; si esa

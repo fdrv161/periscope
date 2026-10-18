@@ -106,6 +106,8 @@ inline const Row* rows() noexcept
         { { "Copied", "Copiado", "Copiado", "Copié", "Kopiert", "Copiato", "Скопировано" } },
         { { "PSR target", nullptr, nullptr, nullptr, nullptr, nullptr, "Цель PSR" } },
         { { "Crest factor", nullptr, nullptr, nullptr, nullptr, nullptr, "Крест-фактор" } },
+        { { "Correlation history", nullptr, nullptr, nullptr, nullptr, nullptr, "История корреляции" } },
+        { { "over {0}: below zero {1}, below 0.5 {2}, lowest {3}", nullptr, nullptr, nullptr, nullptr, nullptr, "за {0}: ниже нуля {1}, ниже 0.5 {2}, минимум {3}" } },
         { { "Time below the PSR target", nullptr, nullptr, nullptr, nullptr, nullptr, "Время ниже цели PSR" } },
         { { ", below target", nullptr, nullptr, nullptr, nullptr, nullptr, ", ниже цели" } },
         { { "{0} of the time below {1}, over {2}", nullptr, nullptr, nullptr, nullptr, nullptr, "{0} времени ниже {1}, за {2}" } },
@@ -376,5 +378,5 @@ inline const Row* rows() noexcept
     return table;
 }
 
-inline int numRows() noexcept { return 365; }
+inline int numRows() noexcept { return 367; }
 }

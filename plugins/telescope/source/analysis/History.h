@@ -112,4 +112,45 @@ private:
     std::array<juce::uint32, kCapacity> seconds {};
     int writePos = 0;
 };
+
+// Periscope: the broadband L/R correlation of each second, 10 minutes since the reset, for the Scope lens's
+// correlation history row. The engine computes it from the hop sums whatever lens is open (it is three sums per
+// sample), so the history has no gaps. A silent second is stored as kSilent and left out by the reader.
+class CorrelationHistory
+{
+public:
+    static constexpr int   kCapacity = 10 * 60;   // seconds
+    static constexpr float kSilent   = 2.0f;      // outside -1..+1
+
+    void push (float corr) noexcept
+    {
+        const juce::SpinLock::ScopedLockType sl (lock);
+        seconds[(size_t) (writePos % kCapacity)] = corr;
+        ++writePos;
+    }
+
+    void clear() noexcept
+    {
+        const juce::SpinLock::ScopedLockType sl (lock);
+        writePos = 0;
+    }
+
+    // The last `count` seconds, oldest first. The destination is sized before the lock (see History::copyLatest).
+    int copyLatest (std::vector<float>& dst, int count) const
+    {
+        dst.reserve ((size_t) juce::jlimit (0, kCapacity, count));
+        const juce::SpinLock::ScopedLockType sl (lock);
+        const int have = juce::jmin (writePos, kCapacity);
+        const int n    = juce::jmin (count, have);
+        dst.resize ((size_t) n);
+        for (int i = 0; i < n; ++i)
+            dst[(size_t) i] = seconds[(size_t) ((writePos - n + i) % kCapacity)];
+        return n;
+    }
+
+private:
+    mutable juce::SpinLock lock;
+    std::array<float, kCapacity> seconds {};
+    int writePos = 0;
+};
 }

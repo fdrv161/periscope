@@ -60,6 +60,7 @@ public:
     TripleBuffer<FieldFrame>&    field() noexcept { return analysisThread.fieldFrames_(); }
     const LoudnessHistory&       loudnessHistory() const noexcept { return history; }
     const ClipHistory&           clipHistory() const noexcept     { return clips; }
+    const CorrelationHistory&    correlationHistory() const noexcept { return corrSeconds; }   // Periscope
     // ===== 55: la historia POR SEGUNDO (lente VERDICT). 10 minutos a 1 Hz desde el último RESET.
     const SecondHistory&         secondHistory() const noexcept   { return seconds; }
 
@@ -337,6 +338,7 @@ private:
     std::unique_ptr<TripleBuffer<CqtFrame>>         cqtFrames;
     LoudnessHistory             history;
     ClipHistory                 clips;
+    CorrelationHistory          corrSeconds;   // Periscope: before analysisThread, which writes into it
     SecondHistory               seconds;   // ===== 55: ~228 KB, el precio de poder decir "entre 0:20 y 0:35"
     AnalysisThread              analysisThread { bus, frames, history, &scopeFrames, &clips,
                                                  &spectrumFrames, &spectrogramRing,

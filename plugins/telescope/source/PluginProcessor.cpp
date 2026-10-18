@@ -278,6 +278,7 @@ void TelescopeProcessor::syncLensSettings()
     // ===== 54: TONAL BALANCE · engancha la salida y RE-ANALIZA la referencia del estado =====
     analysisThread.setReferenceOutput (&refFrames);
     analysisThread.setSecondHistory (&seconds);   // ===== 55 =====
+    analysisThread.setCorrelationHistory (&corrSeconds);   // Periscope
     syncReference (true);   // Periscope: an undo or a preset does not re-analyse the same file
 
     // ===== 55: VERDICT =====
