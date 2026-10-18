@@ -1087,7 +1087,11 @@ juce::String TonalBalanceLens::a11yCompareValue (int row) const
     const auto& ref = a11yRefLoudness();
     if (! ref.valid) return a11ytext::T ("no reference loaded");
 
-    const auto live = processor.analysis().read().loudness;   // a copy: read() is only valid until the next read
+    // Copies: read() is only valid until the next read. PLR lives on the frame itself, next to the loudness block.
+    const auto& frame = processor.analysis().read();
+    const auto  live = frame.loudness;
+    const bool  plrValid = frame.plrValid;
+    const float plr = frame.plr;
     const auto both = [] (const juce::String& mine, const juce::String& theirs)
     {
         return a11ytext::TF ("your mix {0}, reference {1}", { mine, theirs });
@@ -1113,8 +1117,8 @@ juce::String TonalBalanceLens::a11yCompareValue (int row) const
             return both (spoken::trimmed (live.lra, 1) + a11ytext::T (" LU"), spoken::trimmed (ref.lra, 1) + a11ytext::T (" LU"));
         case cmpPlr:
         {
-            if (! live.plrValid) return a11ytext::T ("play your mix to measure it");
-            return both (spoken::dB (live.plr, 1), spoken::dB (ref.truePeak - ref.integrated, 1));
+            if (! plrValid) return a11ytext::T ("play your mix to measure it");
+            return both (spoken::dB (plr, 1), spoken::dB (ref.truePeak - ref.integrated, 1));
         }
         default:
         {
