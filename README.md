@@ -20,6 +20,13 @@ Install on Windows: extract the ZIP and copy the `Periscope.vst3` folder into `C
 
 Also in [Russian (Русский)](MANUAL.ru.md) and [Spanish (Español)](MANUAL.es.md). The English manual is the main version; the translations are updated together with it.
 
+## What's new in 1.3.0
+
+- **Comparison with the reference** in Tonal balance: how much to turn the reference down or up so both play equally loud, plus loudness range, PLR and true peak, yours and the reference's.
+- **PSR target** in Dynamics, and how much of the time PSR stayed below it.
+- **Crest factor** in Dynamics, counted as most meters do (a sine reads 0 dB).
+- **Correlation history** in Scope: how long the correlation was below zero and below 0.5 over up to 10 minutes.
+
 ## What's new in 1.2.0
 
 - **Q key** on a Spectrum peak or dip: speaks the Q of an EQ bell of the same width, counted the usual way (one octave is Q 1.41).
