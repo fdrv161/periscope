@@ -1065,75 +1065,114 @@ juce::String TonalBalanceLens::a11yRowValue (int group, int row) const
 // The curve is loudness-normalised like the whole lens, so overall level does not show here.
 juce::String TonalBalanceLens::a11yShapeVsReference (bool withQ) const
 {
-    constexpr float kThresholdDb = 3.0f;
-    constexpr int   n = ReferenceFrame::kNumBands;
+    if (! data.liveValid) return a11ytext::T ("play your mix to measure it");
+    constexpr int n = ReferenceFrame::kNumBands;
     int side[n] {};
-    int compared = 0;
+    int compared = 0, firstCmp = -1, lastCmp = -1;
     for (int b = 0; b < n; ++b)
     {
         if (! comparable[b]) continue;
         ++compared;
+        if (firstCmp < 0) firstCmp = b;
+        lastCmp = b;
         const float d = data.deltaDb[b];
-        side[b] = d >= kThresholdDb ? 1 : (d <= -kThresholdDb ? -1 : 0);
+        // kDeltaRefDb: the same 3 dB band that is drawn and labelled on screen.
+        side[b] = d >= kDeltaRefDb ? 1 : (d <= -kDeltaRefDb ? -1 : 0);
     }
-    if (compared == 0) return a11ytext::T ("not enough signal");
+    // A few bands (a bass stem alone) cannot tell the shape of a mix: "all within 3 dB" would claim too much.
+    if (compared < 6) return a11ytext::T ("not enough signal");
     // A single comparable band that falls short between two bands on the same side does not split the stretch.
     for (int b = 1; b < n - 1; ++b)
         if (side[b] == 0 && comparable[b] && side[b - 1] != 0 && side[b - 1] == side[b + 1]
             && data.deltaDb[b] * (float) side[b - 1] > 0.0f)
             side[b] = side[b - 1];
 
-    juce::StringArray parts;
+    struct Stretch { int first, last; double lo, hi, mean; };
+    std::vector<Stretch> found;
     for (int b = 0; b < n;)
     {
         if (side[b] == 0) { ++b; continue; }
         int e = b;
         double sum = 0.0;
         while (e < n && side[e] == side[b]) sum += data.deltaDb[e++];
-        const int last = e - 1;
-        const double lo = kThirdOctaveHz[b] * kSixthDown, hi = kThirdOctaveHz[last] * kSixthUp;
-        const bool atEdge = b == 0 || last == n - 1;
-        const auto where = b == 0 ? a11ytext::TF ("up to {0}", { spoken::hz (spoken::roundHz (hi)) })
-                         : (last == n - 1 ? a11ytext::TF ("above {0}", { spoken::hz (spoken::roundHz (lo)) })
-                                          : spoken::hzRange (lo, hi));
-        if (! withQ)
-            parts.add (where + " " + spoken::signedDb ((float) (sum / (e - b))));
-        else
-        {
-            // Periscope: the Q key. A stretch at either end of the range is a job for a shelf; a closed stretch gets the
-            // bell Q of the same width, RBJ style as on Spectrum's peaks (Q = sqrt (lo * hi) / (hi - lo)). Its edges
-            // are where the difference crosses 3 dB, not half its height, so the Q is a starting point.
-            const double q = std::sqrt (lo * hi) / (hi - lo);
-            parts.add (where + ": " + (atEdge ? a11ytext::T ("shelf")
-                                              : a11ytext::TF ("Q {0}", { spoken::trimmed (q, q < 10.0 ? 1 : 0) })));
-        }
+        found.push_back ({ b, e - 1, kThirdOctaveHz[b] * kSixthDown, kThirdOctaveHz[e - 1] * kSixthUp, sum / (e - b) });
         b = e;
     }
-    if (parts.isEmpty()) return a11ytext::TF ("all within {0} dB of the reference", { spoken::trimmed (kThresholdDb, 1) });
+    if (found.empty()) return a11ytext::TF ("all within {0} dB of the reference", { spoken::trimmed (kDeltaRefDb, 1) });
+    // At most six, as Spectrum's shape row: the biggest (width times difference) first, then back in frequency order.
+    if (found.size() > 6)
+    {
+        std::sort (found.begin(), found.end(), [] (const Stretch& x, const Stretch& y)
+                   { return (x.last - x.first + 1) * std::abs (x.mean) > (y.last - y.first + 1) * std::abs (y.mean); });
+        found.resize (6);
+        std::sort (found.begin(), found.end(), [] (const Stretch& x, const Stretch& y) { return x.first < y.first; });
+    }
+
+    juce::StringArray parts;
+    for (const auto& st : found)
+    {
+        // The words name the grid's ends ("up to", "above"), as the stretch really ends there.
+        const auto where = st.first == 0 ? a11ytext::TF ("up to {0}", { spoken::hz (spoken::roundHz (st.hi)) })
+                         : (st.last == n - 1 ? a11ytext::TF ("above {0}", { spoken::hz (spoken::roundHz (st.lo)) })
+                                             : spoken::hzRange (st.lo, st.hi));
+        if (! withQ) { parts.add (where + " " + spoken::signedDb ((float) st.mean)); continue; }
+
+        // The Q key. A stretch that reaches the end of what both sides measured is a job for a shelf (a reference
+        // cut at 16 kHz ends there, not at 20 kHz); a closed stretch gets the bell's centre and its RBJ Q, as on
+        // Spectrum's peaks. Its edges are where the difference crosses 3 dB, not half its height: a starting point.
+        // A single band is as narrow as this grid can tell, so its Q is a lower bound.
+        if (st.first <= firstCmp || st.last >= lastCmp) { parts.add (where + ": " + a11ytext::T ("shelf")); continue; }
+        const double centre = std::sqrt (st.lo * st.hi), q = centre / (st.hi - st.lo);
+        const auto   qs = spoken::trimmed (q, q < 1.0 ? 2 : (q < 10.0 ? 1 : 0));
+        parts.add (where + ": " + a11ytext::TF (st.first == st.last ? "around {0}, Q {1} or more" : "around {0}, Q {1}",
+                                                 { spoken::hz (spoken::roundHz (centre)), qs }));
+    }
     return parts.joinIntoString (withQ ? "; " : ", ");
 }
 
 // Periscope: Q on the shape row speaks the EQ setting for each stretch; other rows keep Q as a letter search.
 juce::String TonalBalanceLens::a11yRowQ (int group, int row) const
 {
-    if (group != tbSummary || row != rowShape || ! data.refValid) return {};
-    return a11yShapeVsReference (true);
+    if (group != tbSummary || row != rowShape) return {};
+    return data.refValid ? a11yShapeVsReference (true) : juce::String (a11ytext::T ("no reference loaded"));
 }
 
 // Periscope: how the difference curve leans, a straight-line fit of the comparable bands from 50 Hz to 10 kHz against
-// octaves, as Spectrum's signal tilt. Positive: your mix is brighter than the reference.
+// octaves, with Spectrum's guards: at least 8 bands spanning 3 octaves or more (a hi-hat alone has only a local
+// tilt), and a band more than 3 dB from the median of its neighbours counts as that median, so one narrow
+// difference does not lean the whole line. Positive: your mix is brighter than the reference.
 juce::String TonalBalanceLens::a11yTiltVsReference() const
 {
-    double sx = 0.0, sy = 0.0, sxx = 0.0, sxy = 0.0;
-    int count = 0;
+    if (! data.liveValid) return a11ytext::T ("play your mix to measure it");
+    std::vector<double> xs, ys;
     for (int b = 0; b < ReferenceFrame::kNumBands; ++b)
     {
         if (! comparable[b] || kThirdOctaveHz[b] < 50.0 || kThirdOctaveHz[b] > 10000.0) continue;
-        const double x = std::log2 (kThirdOctaveHz[b] / 1000.0), y = data.deltaDb[b];
-        sx += x; sy += y; sxx += x * x; sxy += x * y; ++count;
+        xs.push_back (std::log2 (kThirdOctaveHz[b] / 1000.0));
+        ys.push_back (data.deltaDb[b]);
+    }
+    const int count = (int) xs.size();
+    if (count < 8 || xs.back() - xs.front() < 3.0) return a11ytext::T ("not enough signal");
+
+    std::vector<double> robust (ys);
+    for (int i = 0; i < count; ++i)
+    {
+        std::vector<double> around;
+        for (int j = juce::jmax (0, i - 2); j <= juce::jmin (count - 1, i + 2); ++j)
+            if (j != i) around.push_back (ys[(size_t) j]);
+        std::sort (around.begin(), around.end());
+        const double median = around[around.size() / 2];
+        if (std::abs (ys[(size_t) i] - median) > kDeltaRefDb) robust[(size_t) i] = median;
+    }
+
+    double sx = 0.0, sy = 0.0, sxx = 0.0, sxy = 0.0;
+    for (int i = 0; i < count; ++i)
+    {
+        const double x = xs[(size_t) i], y = robust[(size_t) i];
+        sx += x; sy += y; sxx += x * x; sxy += x * y;
     }
     const double den = count * sxx - sx * sx;
-    if (count < 6 || den <= 0.0) return a11ytext::T ("not enough signal");
+    if (den <= 0.0) return a11ytext::T ("not enough signal");
     const float slope = (float) ((count * sxy - sx * sy) / den);
     if (std::abs (slope) < 0.25f) return a11ytext::T ("same tilt as the reference");
     return a11ytext::TF (slope > 0.0f ? "brighter than the reference by {0} dB per octave"
@@ -1145,7 +1184,9 @@ juce::String TonalBalanceLens::a11yTiltVsReference() const
 juce::String TonalBalanceLens::a11yRowHelp (int group, int row) const
 {
     if (group == tbSummary && row == rowShape)
-        return a11ytext::T ("Shape against the reference: the broad stretches where your mix is 3 dB or more above or below the reference, loudness already matched. Press Q for the EQ setting of each stretch: the Q of a bell of the same width, or a shelf at either end of the range.");
+        return a11ytext::T ("Shape against the reference: the broad stretches where your mix is 3 dB or more above or below the reference, loudness already matched. Press Q for the EQ setting of each stretch: the centre and Q of a bell of the same width, or a shelf where a stretch reaches the end of what both sides measured.");
+    if (group == tbSummary && row == rowTilt)
+        return a11ytext::T ("Tilt against the reference: a straight line through the difference from 50 Hz to 10 kHz, in dB per octave. Under 0.25 dB per octave it counts as the same tilt as the reference. It needs at least 8 bands over 3 octaves.");
     if (group != tbCompare) return {};
     // One literal: the key collector (_scripts/collect_keys.py) takes each literal of a T() call on its own.
     return a11ytext::T ("Your mix against the reference, in the units of the Loudness and Dynamics lenses. Your mix counts from the last reset (Reset averaging here, or Reset in Loudness), the reference is the whole file or its section. The Loudness row says how much to turn the reference down or up so that both play equally loud.");

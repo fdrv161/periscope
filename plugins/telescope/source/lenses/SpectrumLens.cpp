@@ -1129,12 +1129,18 @@ juce::String SpectrumLens::a11yFeatureQ (const Feature& f) const
     const bool   atGrid   = f.hiHz <= f.loHz * minRatio;
     const double lo = f.loHz, hi = atGrid ? f.loHz * minRatio : f.hiHz;
     const double q  = std::sqrt (lo * hi) / (hi - lo);
-    const auto   qs = spoken::trimmed ((float) q, q < 10.0 ? 1 : 0);
-    auto t = atGrid ? a11ytext::TF ("Q {0} or more", { qs }) : a11ytext::TF ("Q {0}", { qs });
+    // Two decimals below 1, so broad humps (0.27, 0.18) stay apart (review after 1.3.0).
+    const auto   qs = spoken::trimmed ((float) q, q < 1.0 ? 2 : (q < 10.0 ? 1 : 0));
+    // The feature's frequency first: the peak list is rebuilt while music plays, and the answer must say which one.
+    auto t = spoken::hz (f.hz) + ", " + (atGrid ? a11ytext::TF ("Q {0} or more", { qs }) : a11ytext::TF ("Q {0}", { qs }));
 
     // Smoothing widens every hump to at least its own width, so a hump that narrow may be narrower in fact.
     const int denom = smoothDenom (processor.spectrumSmoothIndex());
     if (denom > 0 && std::log2 (hi / lo) <= 1.25 / denom) t << ", " << a11ytext::T ("limited by the smoothing");
+    // In the bass the FFT bin is wider than the speech grid: a hump about the window's main lobe wide is the FFT's
+    // width, not the sound's (a room mode reads Q 1.7 at 60 Hz with FFT 4096). Say so.
+    else if (! atGrid && fftSizeSeen > 0 && hi - lo <= 4.0 * srSeen / (double) fftSizeSeen)
+        t << ", " << a11ytext::T ("limited by the FFT size");
     return t;
 }
 
