@@ -1704,9 +1704,21 @@ const SpectrumLens::A11yShape& SpectrumLens::a11yShape() const
     const double scaleOct = denom > 0 ? 1.0 / denom : 1.0 / 48.0;
     const int    halfWin  = juce::jmax (kGridPerOct / 6, (int) std::lround (kGridPerOct * 8.0 * scaleOct / 2.0));
 
+    // Periscope: unsmoothed, a tone in the bass is as wide as the FFT window's main lobe (about 3 bins: 35 Hz at 60 Hz with
+    // FFT 4096), wider than 1/6 octave, so the median of a 1/6-octave neighbourhood sat on the hump and a pure bass tone
+    // was not listed at all. The neighbourhood is at least 6 bins either side there (at most 2 octaves).
+    const double binHz = fftSizeSeen > 0 ? srSeen / (double) fftSizeSeen : 0.0;
+    const auto windowAt = [&] (int i)
+    {
+        if (denom > 0 || binHz <= 0.0) return halfWin;
+        const double gridPerHz = kGridPerOct / (gridHz (i) * std::log (2.0));
+        return juce::jlimit (halfWin, 2 * kGridPerOct, (int) std::lround (6.0 * binHz * gridPerHz));
+    };
+
     const auto standsOut = [&] (int i, bool dip)
     {
-        const int   lo = juce::jmax (0, i - halfWin), hi = juce::jmin (n - 1, i + halfWin);
+        const int   w  = windowAt (i);
+        const int   lo = juce::jmax (0, i - w), hi = juce::jmin (n - 1, i + w);
         const float v  = view[(size_t) i];
         if (denom <= 0) return dip ? medianOf (view, lo, hi, scratch) - v : v - medianOf (view, lo, hi, scratch);
         const auto sideBase = [&] (int step)
