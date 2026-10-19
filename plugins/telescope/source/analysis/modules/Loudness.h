@@ -150,7 +150,7 @@ public:
 private:
     void finishHop();
     void recomputeIntegrated();
-    void recomputeLra();
+    void recomputeLra (float newShortTerm);
     void resetClipCount();
 
     static double meanOfLast (const std::deque<double>& d, int count) noexcept;
@@ -175,7 +175,23 @@ private:
 
     std::deque<double> msL, msR;      // media cuadrática por hop (los últimos kShortTermHops)
     std::vector<double> blockZ;       // Σ G_i·z_ij de cada bloque de 400 ms (para el integrado)
-    std::vector<float>  stValues;     // short-term LUFS (para el LRA)
+
+    // Periscope: the integrated and the LRA used to re-scan the whole history every 100 ms (two log10 per block,
+    // a pow per short-term value and a full sort), which grew without end in a long session. These keep the same
+    // numbers bit for bit (the same values summed in the same order) at almost constant cost:
+    //   · each block's LUFS is computed once; the absolute-gated sum runs as blocks arrive;
+    //   · the relative-gated sum only gets the new block added unless the moved gate crossed an older block
+    //     (checked in the sorted list), and only then is the history summed again, in block order, without logs;
+    //   · the LRA keeps the absolute-gated short-term values sorted (one insertion per hop) with their running
+    //     power, and reads P10 and P95 from the part above the relative gate.
+    std::vector<float>  blockLufs;        // toLufs of each block, in block order
+    std::vector<float>  gatedBlockSorted; // the LUFS of the blocks above the absolute gate, ascending
+    double    absSum = 0.0, relSum = 0.0;
+    long long absCount = 0, relCount = 0;
+    double    relGateLast = 0.0;
+    bool      relKnown = false;
+    std::vector<float>  stGatedSorted;    // short-term LUFS >= the absolute gate, ascending (for the LRA)
+    double    stPower = 0.0;              // Σ 10^(v/10) of those, in arrival order
 
     // ---- DYNAMICS ----
     float              hopTpLin = 0.0f;      // |y| máximo del hop en curso (lineal, antes del K-weighting)

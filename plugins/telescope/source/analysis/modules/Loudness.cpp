@@ -33,13 +33,22 @@ void Loudness::reset()
 
     msL.clear(); msR.clear();
     blockZ.clear();
-    stValues.clear();
+    blockLufs.clear();
+    gatedBlockSorted.clear();
+    absSum = relSum = 0.0;
+    absCount = relCount = 0;
+    relGateLast = 0.0;
+    relKnown = false;
+    stGatedSorted.clear();
+    stPower = 0.0;
     hopTpDb.clear();
     hopTpLin = 0.0f;
     hopTpLinL = hopTpLinR = 0.0f;   // 57c (M-1 del revisor): los acumuladores por canal se limpian como el conjunto
     // 10 minutos de holgura: es la ventana de la historia del sello y evita realocar durante una medición.
     blockZ.reserve (10 * 60 * 10);
-    stValues.reserve (10 * 60 * 10);
+    blockLufs.reserve (10 * 60 * 10);
+    gatedBlockSorted.reserve (10 * 60 * 10);
+    stGatedSorted.reserve (10 * 60 * 10);
 
     current = Result{};
     resetClipCount();
@@ -188,8 +197,7 @@ void Loudness::finishHop()
         current.shortTerm = toLufs (zSum);
         if (current.shortTerm > current.shortTermMax) current.shortTermMax = current.shortTerm;
 
-        stValues.push_back (current.shortTerm);
-        recomputeLra();
+        recomputeLra (current.shortTerm);
 
         // HISTOGRAMA — un bin por short-term válido. El bin i está centrado en (i - 60) LUFS: se redondea
         // (no se trunca) porque los valores caen JUSTO sobre los enteros (un seno a -20 dBFS da -20.000
@@ -221,71 +229,100 @@ void Loudness::finishHop()
 }
 
 // Doble compuerta de BS.1770: absoluta -70 LUFS, después relativa a 10 LU bajo la media de los que pasaron.
+// Periscope: incremental, with the same result bit for bit as summing the whole history (see Loudness.h).
 void Loudness::recomputeIntegrated()
 {
-    double sumAbs = 0.0;
-    int    cntAbs = 0;
-    for (const double z : blockZ)
-        if (toLufs (z) > kAbsGate) { sumAbs += z; ++cntAbs; }
+    // The block just pushed: its LUFS once, and the absolute-gated running sum (block order, as before).
+    const double zNew = blockZ.back();
+    const float  lNew = toLufs (zNew);
+    blockLufs.push_back (lNew);
+    const bool newAbs = lNew > kAbsGate;
+    if (newAbs)
+    {
+        absSum += zNew;
+        ++absCount;
+        gatedBlockSorted.insert (std::upper_bound (gatedBlockSorted.begin(), gatedBlockSorted.end(), lNew), lNew);
+    }
 
-    if (cntAbs == 0)
+    if (absCount == 0)
     {
         current.integrated      = kSilenceFloor;
         current.integratedValid = false;
         return;
     }
 
-    const double relGate = (double) toLufs (sumAbs / (double) cntAbs) + kRelGateI;
+    const double relGate = (double) toLufs (absSum / (double) absCount) + kRelGateI;
 
-    double sumRel = 0.0;
-    int    cntRel = 0;
-    for (const double z : blockZ)
+    // Does any OLDER gated block change side of the relative gate? Its side changes when its level lies in
+    // (lower gate, higher gate]. The new block sits in the sorted list too, so it is taken out of the count.
+    bool rescan = ! relKnown;
+    if (! rescan && relGate != relGateLast)
     {
-        const double l = (double) toLufs (z);
-        if (l > kAbsGate && l > relGate) { sumRel += z; ++cntRel; }
+        const double lo = std::min (relGate, relGateLast), hi = std::max (relGate, relGateLast);
+        const auto above = [] (double g, float v) { return g < (double) v; };
+        const auto a = std::upper_bound (gatedBlockSorted.begin(), gatedBlockSorted.end(), lo, above);
+        const auto b = std::upper_bound (gatedBlockSorted.begin(), gatedBlockSorted.end(), hi, above);
+        auto crossing = (long long) (b - a);
+        if (newAbs && (double) lNew > lo && (double) lNew <= hi) --crossing;
+        rescan = crossing > 0;
     }
 
-    if (cntRel == 0)
+    if (rescan)
+    {
+        // The same loop as the author's, in block order, with the stored LUFS instead of two log10 per block.
+        relSum   = 0.0;
+        relCount = 0;
+        for (size_t i = 0; i < blockZ.size(); ++i)
+        {
+            const double l = (double) blockLufs[i];
+            if (l > kAbsGate && l > relGate) { relSum += blockZ[i]; ++relCount; }
+        }
+        relKnown = true;
+    }
+    else if (newAbs && (double) lNew > relGate)
+    {
+        // Same set as before plus the new block, which is the last one: adding it last is the block-order sum.
+        relSum += zNew;
+        ++relCount;
+    }
+    relGateLast = relGate;
+
+    if (relCount == 0)
     {
         current.integrated      = kSilenceFloor;
         current.integratedValid = false;
         return;
     }
 
-    current.integrated      = toLufs (sumRel / (double) cntRel);
+    current.integrated      = toLufs (relSum / (double) relCount);
     current.integratedValid = true;
 }
 
 // LRA — EBU Tech 3342 §5, siguiendo la implementación MATLAB de referencia del propio documento:
 // compuerta absoluta >= -70, después >= (media energética de los que pasaron) - 20 LU, y P95 - P10 sobre
 // los que quedan (índices redondeados sobre n-1, como el `round((n-1)*PRC/100 + 1)` del MATLAB).
-void Loudness::recomputeLra()
+void Loudness::recomputeLra (float v)
 {
-    std::vector<float> absGated;
-    absGated.reserve (stValues.size());
-    double power = 0.0;
-    for (const float v : stValues)
-        if (v >= (float) kAbsGate)
-        {
-            absGated.push_back (v);
-            power += std::pow (10.0, (double) v / 10.0);
-        }
+    // Periscope: the absolute-gated values stay sorted and their power runs in arrival order, the same order and
+    // the same terms the author's loop summed, so the result is identical bit for bit (see Loudness.h).
+    if (v >= (float) kAbsGate)
+    {
+        stPower += std::pow (10.0, (double) v / 10.0);
+        stGatedSorted.insert (std::upper_bound (stGatedSorted.begin(), stGatedSorted.end(), v), v);
+    }
+    if (stGatedSorted.empty()) { current.lra = 0.0f; return; }
 
-    if (absGated.empty()) { current.lra = 0.0f; return; }
+    const double integ = 10.0 * std::log10 (stPower / (double) stGatedSorted.size());
+    const double gate  = integ + kRelGateLra;
+    // The relative-gated values, sorted, are the tail of the list from the first value >= the gate.
+    const auto first = std::partition_point (stGatedSorted.begin(), stGatedSorted.end(),
+                                             [gate] (float x) { return (double) x < gate; });
+    const auto count = (size_t) (stGatedSorted.end() - first);
+    if (count == 0) { current.lra = 0.0f; return; }
 
-    const double integ = 10.0 * std::log10 (power / (double) absGated.size());
-
-    std::vector<float> relGated;
-    relGated.reserve (absGated.size());
-    for (const float v : absGated)
-        if ((double) v >= integ + kRelGateLra) relGated.push_back (v);
-
-    if (relGated.empty()) { current.lra = 0.0f; return; }
-
-    std::sort (relGated.begin(), relGated.end());
-    const auto n   = (double) relGated.size() - 1.0;
+    const auto n   = (double) count - 1.0;
     const auto lo  = (size_t) std::llround (n * 0.10);
     const auto hi  = (size_t) std::llround (n * 0.95);
-    current.lra = relGated[hi] - relGated[lo];
+    current.lra = first[(std::ptrdiff_t) hi] - first[(std::ptrdiff_t) lo];
 }
 }
