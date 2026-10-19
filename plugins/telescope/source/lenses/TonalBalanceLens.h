@@ -191,7 +191,8 @@ private:
     const RefLoudness& a11yRefLoudness() const;
     juce::String       a11yCompareValue (int row) const;
     // Periscope: the first glance at the difference curve, as Spectrum's shape and tilt rows against its line.
-    juce::String       a11yShapeVsReference() const;
+    juce::String       a11yShapeVsReference (bool withQ = false) const;   // withQ: the Q key on that row
+    juce::String       a11yRowQ (int group, int row) const override;
     juce::String       a11yTiltVsReference() const;
     mutable RefLoudness  refLoudness;
     mutable juce::uint32 refLoudnessRevision = 0;

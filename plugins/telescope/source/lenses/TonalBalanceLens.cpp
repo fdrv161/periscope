@@ -1063,7 +1063,7 @@ juce::String TonalBalanceLens::a11yRowValue (int group, int row) const
 // the line. Stretches of comparable bands where your mix is 3 dB or more above or below the reference (the band drawn
 // on screen), joined across a single band that falls short, in frequency order, each with its mean difference.
 // The curve is loudness-normalised like the whole lens, so overall level does not show here.
-juce::String TonalBalanceLens::a11yShapeVsReference() const
+juce::String TonalBalanceLens::a11yShapeVsReference (bool withQ) const
 {
     constexpr float kThresholdDb = 3.0f;
     constexpr int   n = ReferenceFrame::kNumBands;
@@ -1092,14 +1092,32 @@ juce::String TonalBalanceLens::a11yShapeVsReference() const
         while (e < n && side[e] == side[b]) sum += data.deltaDb[e++];
         const int last = e - 1;
         const double lo = kThirdOctaveHz[b] * kSixthDown, hi = kThirdOctaveHz[last] * kSixthUp;
+        const bool atEdge = b == 0 || last == n - 1;
         const auto where = b == 0 ? a11ytext::TF ("up to {0}", { spoken::hz (spoken::roundHz (hi)) })
                          : (last == n - 1 ? a11ytext::TF ("above {0}", { spoken::hz (spoken::roundHz (lo)) })
                                           : spoken::hzRange (lo, hi));
-        parts.add (where + " " + spoken::signedDb ((float) (sum / (e - b))));
+        if (! withQ)
+            parts.add (where + " " + spoken::signedDb ((float) (sum / (e - b))));
+        else
+        {
+            // Periscope: the Q key. A stretch at either end of the range is a job for a shelf; a closed stretch gets the
+            // bell Q of the same width, RBJ style as on Spectrum's peaks (Q = sqrt (lo * hi) / (hi - lo)). Its edges
+            // are where the difference crosses 3 dB, not half its height, so the Q is a starting point.
+            const double q = std::sqrt (lo * hi) / (hi - lo);
+            parts.add (where + ": " + (atEdge ? a11ytext::T ("shelf")
+                                              : a11ytext::TF ("Q {0}", { spoken::trimmed (q, q < 10.0 ? 1 : 0) })));
+        }
         b = e;
     }
     if (parts.isEmpty()) return a11ytext::TF ("all within {0} dB of the reference", { spoken::trimmed (kThresholdDb, 1) });
-    return parts.joinIntoString (", ");
+    return parts.joinIntoString (withQ ? "; " : ", ");
+}
+
+// Periscope: Q on the shape row speaks the EQ setting for each stretch; other rows keep Q as a letter search.
+juce::String TonalBalanceLens::a11yRowQ (int group, int row) const
+{
+    if (group != tbSummary || row != rowShape || ! data.refValid) return {};
+    return a11yShapeVsReference (true);
 }
 
 // Periscope: how the difference curve leans, a straight-line fit of the comparable bands from 50 Hz to 10 kHz against
@@ -1124,8 +1142,10 @@ juce::String TonalBalanceLens::a11yTiltVsReference() const
 }
 
 // Periscope: help for the comparison rows (F1).
-juce::String TonalBalanceLens::a11yRowHelp (int group, int) const
+juce::String TonalBalanceLens::a11yRowHelp (int group, int row) const
 {
+    if (group == tbSummary && row == rowShape)
+        return a11ytext::T ("Shape against the reference: the broad stretches where your mix is 3 dB or more above or below the reference, loudness already matched. Press Q for the EQ setting of each stretch: the Q of a bell of the same width, or a shelf at either end of the range.");
     if (group != tbCompare) return {};
     // One literal: the key collector (_scripts/collect_keys.py) takes each literal of a T() call on its own.
     return a11ytext::T ("Your mix against the reference, in the units of the Loudness and Dynamics lenses. Your mix counts from the last reset (Reset averaging here, or Reset in Loudness), the reference is the whole file or its section. The Loudness row says how much to turn the reference down or up so that both play equally loud.");

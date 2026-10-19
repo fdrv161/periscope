@@ -104,6 +104,8 @@ inline const Row* rows() noexcept
         { { "Edit", "Edición", "Edição", "Modification", "Bearbeiten", "Modifica", "Правка" } },
         { { "Read only", "Solo lectura", "Somente leitura", "Lecture seule", "Nur lesen", "Sola lettura", "Только чтение" } },
         { { "Copied", "Copiado", "Copiado", "Copié", "Kopiert", "Copiato", "Скопировано" } },
+        { { "shelf", nullptr, nullptr, nullptr, nullptr, nullptr, "полка" } },
+        { { "Shape against the reference: the broad stretches where your mix is 3 dB or more above or below the reference, loudness already matched. Press Q for the EQ setting of each stretch: the Q of a bell of the same width, or a shelf at either end of the range.", nullptr, nullptr, nullptr, nullptr, nullptr, "Форма относительно референса: широкие участки, где ваш микс на 3 dB и больше громче или тише референса, громкость уже выровнена. Нажмите Q, чтобы услышать настройку эквалайзера для каждого участка: Q колокола той же ширины или полку у краёв диапазона." } },
         { { "Shape against the reference", "Forma respecto a la referencia", "Forma em relação à referência", "Forme par rapport à la référence", "Form gegenüber der Referenz", "Forma rispetto al riferimento", "Форма относительно референса" } },
         { { "Tilt against the reference", "Pendiente respecto a la referencia", "Inclinação em relação à referência", "Pente par rapport à la référence", "Neigung gegenüber der Referenz", "Pendenza rispetto al riferimento", "Наклон относительно референса" } },
         { { "all within {0} dB of the reference", "todo dentro de {0} dB de la referencia", "tudo dentro de {0} dB da referência", "tout à moins de {0} dB de la référence", "alles innerhalb von {0} dB um die Referenz", "tutto entro {0} dB dal riferimento", "всё в пределах {0} dB от референса" } },
@@ -384,5 +386,5 @@ inline const Row* rows() noexcept
     return table;
 }
 
-inline int numRows() noexcept { return 373; }
+inline int numRows() noexcept { return 375; }
 }
