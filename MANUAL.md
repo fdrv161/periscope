@@ -525,6 +525,8 @@ For numbers per third-octave band, use Band correlation.
   - **State**: what the lens is doing, as the status line on screen says (measuring, analysing the reference and so on).
   - **Reference**: the reference file name, or "none".
   - **Reference section**: the part of the reference being used, or "whole file".
+  - **Shape against the reference**: the first glance at the difference curve, as Spectrum's shape against its line, with the reference in place of the line. The broad stretches where your mix is 3 dB or more above or below the reference (the band drawn on screen), each with its average difference, for example "85 to 180 Hz +4 dB, above 11 kHz -6 dB"; or "all within 3 dB of the reference". Loudness is already matched, so overall level does not show here.
+  - **Tilt against the reference**: how the difference leans from 50 Hz to 10 kHz, for example "darker than the reference by 0.8 dB per octave", or "same tilt as the reference". A tilt says the whole balance leans one way; a shape without a tilt points at single regions.
   - **Largest difference 1 to 5**: the bands where your programme differs most from the reference, for example "125 Hz, 3.2 dB louder than the reference".
 - **Comparison with the reference**: your mix against the reference, in the same units as the Loudness and Dynamics lenses. Your mix counts from the last reset; the reference is the whole file or its section.
   - **Loudness**: how much to turn the reference down or up so that both play equally loud, then both integrated values. For example: "reference louder by 2.6 dB, turn it down by 2.6 dB; your mix -12.4 LUFS, reference -9.8 LUFS". Set the reference track's fader by that amount and compare by ear at the same loudness.
