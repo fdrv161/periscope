@@ -368,15 +368,16 @@ TEST_CASE ("telescope: el cromagrama de una triada de Do mayor deja C, E y G arr
     std::sort (top.begin(), top.end());
     REQUIRE (top == std::array<int, 3> { 0, 4, 7 });
 
-    // Y los otros nueve por debajo de 0.3 (el criterio del prompt); los que reciben la falda de Hann
-    // —B, D# y F#, un bin por debajo de cada nota— quedan en la relación derivada de 0.20.
+    // Y los otros nueve por debajo de 0.3 (el criterio del prompt). Periscope: the quarter-tone bins are now split
+    // between both neighbours, so the Hann skirt lands half a semitone below AND above each note: 0.125 / 1.25 = 0.10
+    // on B, C#, D#, F, F# and G#, symmetric (the author's floor(k/2) gave 0.20 below and nothing above).
     for (int i = 3; i < 12; ++i)
     {
         INFO ("clase " << kClassNames[order[i]] << " = " << f.chroma[order[i]]);
         REQUIRE (f.chroma[order[i]] < 0.3f);
     }
-    for (const int leak : { 11, 3, 6 })     // B, D#, F#
-        REQUIRE_THAT (f.chroma[leak], Catch::Matchers::WithinAbs (0.20f, 0.06f));
+    for (const int leak : { 11, 1, 3, 5, 6, 8 })     // B, C#, D#, F, F#, G#
+        REQUIRE_THAT (f.chroma[leak], Catch::Matchers::WithinAbs (0.10f, 0.04f));
 }
 
 // ============================================================================ 5 · tonalidad
@@ -530,13 +531,15 @@ TEST_CASE ("telescope: cinco A en cinco octavas son una sola clase de nota", "[t
 
     std::printf ("CQT[octavas] ");
     for (int c = 0; c < 12; ++c) std::printf ("%s=%.3f ", kClassNames[c], f.chroma[c]);
-    std::printf ("  (la falda de Hann a un bin deja G# en 0.25/1.25 = 0.20 derivado)\n");
+    std::printf ("  (Hann skirt split between G# and A#: 0.125/1.25 = 0.10 each)\n");
 
     REQUIRE (f.chroma[9] == 1.0f);                                    // La, normalizado al máximo
-    REQUIRE_THAT (f.chroma[8], Catch::Matchers::WithinAbs (0.20f, 0.05f));   // Sol#: la falda, derivada
+    // Periscope: centred mapping, the skirt goes half to G# and half to A# (see case 4).
+    REQUIRE_THAT (f.chroma[8],  Catch::Matchers::WithinAbs (0.10f, 0.04f));   // Sol#
+    REQUIRE_THAT (f.chroma[10], Catch::Matchers::WithinAbs (0.10f, 0.04f));   // La#
     for (int c = 0; c < 12; ++c)
     {
-        if (c == 9 || c == 8) continue;
+        if (c == 8 || c == 9 || c == 10) continue;
         INFO ("clase " << kClassNames[c] << " = " << f.chroma[c]);
         REQUIRE (f.chroma[c] < 0.05f);
     }

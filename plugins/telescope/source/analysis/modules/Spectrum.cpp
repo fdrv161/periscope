@@ -554,13 +554,26 @@ void Spectrum::updateBandsAndHold (int slot, double dt, bool emit)
     const double binHz = sr / (double) size;
     const float  decay = current.holdDecayDbPerSec * (float) dt;
 
+    // Periscope: band power as a real band filter would read it. Each bin stands for [k - 1/2, k + 1/2) bins and
+    // counts by the share of that cell inside the band (as ThirdOctaveAverage does), so noise reads its true band
+    // power at any FFT size; before, a 25 Hz band with one whole bin read noise up to 6 dB high. The sum is divided
+    // by the window's ENBW: the bins of one sine add up to A^2 * ENBW, so without it every bar read 1.76 dB high
+    // with Hann and 3 dB with Blackman-Harris, and changing the window moved the bars. A band with no bin centre
+    // inside is still "not measurable", as the lens says.
+    const double enbw = npg / std::max (1.0e-12, cg * cg);
     const auto sumPower = [&] (double lo, double hi)
     {
-        const int k0 = std::max (0, (int) std::ceil (lo / binHz));
-        const int k1 = std::min (bins, (int) std::ceil (hi / binHz));   // [lo, hi)
+        if (std::min (bins, (int) std::ceil (hi / binHz)) <= std::max (0, (int) std::ceil (lo / binHz)))
+            return -1.0;                // banda sin ningún bin (FFT chica en graves): no hay medición
+        const int k0 = std::max (0, (int) std::floor (lo / binHz + 0.5));
+        const int k1 = std::min (bins - 1, (int) std::floor (hi / binHz + 0.5));
         double p = 0.0;
-        for (int k = k0; k < k1; ++k) p += a[(size_t) k];
-        return k1 > k0 ? p : -1.0;      // banda sin ningún bin (FFT chica en graves): no hay medición
+        for (int k = k0; k <= k1; ++k)
+        {
+            const double ov = std::min (hi, ((double) k + 0.5) * binHz) - std::max (lo, ((double) k - 0.5) * binHz);
+            if (ov > 0.0) p += a[(size_t) k] * (ov / binHz);
+        }
+        return p / enbw;
     };
 
     constexpr double kSixthOctDown = 0.8908987181403393;   // 2^(-1/6)

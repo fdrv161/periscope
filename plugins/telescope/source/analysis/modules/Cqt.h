@@ -70,6 +70,9 @@ public:
     static constexpr double kFMinHz        = 27.5;      // A0
     static constexpr double kFMaxHz        = 20000.0;
     static constexpr double kNyquistFrac   = 0.45;      // f_max nunca pasa de 0.45·fs (ver el header)
+    // Periscope: the range the chromagram sums (Essentia HPCP defaults); the spectrum itself keeps A0 to 20 kHz.
+    static constexpr double kChromaLoHz    = 40.0;
+    static constexpr double kChromaHiHz    = 5000.0;
     static constexpr int    kMaxBins       = CqtFrame::kMaxBins;
     // El umbral de poda de Brown & Puckette 1992 (§III): se descartan los coeficientes por debajo de
     // 0.0054 del máximo del kernel. No es un número de la casa; se cita.

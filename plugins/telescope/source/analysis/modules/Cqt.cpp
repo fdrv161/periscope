@@ -355,9 +355,27 @@ void Cqt::computeFrame()
 //======================================================================================== cromagrama y tonalidad
 void Cqt::updateChromaAndKey (double dt)
 {
+    // Periscope: a bin on a semitone goes to its class; a bin a quarter tone above it is split half and half
+    // between that class and the next one. The author's floor(k/2) gave that whole bin to the lower class, so every
+    // note leaked about 16 % of its power one semitone down and none up, and a recording tuned 25 cents flat
+    // (A = 432 Hz is 32 cents flat) put about half of each note into the wrong class. Only 40 Hz to 5 kHz counts,
+    // as in Essentia's HPCP: higher up cymbals and sibilants spread over all classes and flatten the key.
     chromaPow.fill (0.0);
     for (int k = 0; k < bins; ++k)
-        chromaPow[(size_t) pitchClassOf (k)] += binPow[(size_t) k];
+    {
+        const double f = binFrequency (k);
+        if (f < kChromaLoHz || f > kChromaHiHz) continue;
+        const double p = binPow[(size_t) k];
+        if ((k % 2) == 0)
+        {
+            chromaPow[(size_t) pitchClassOf (k)] += p;
+        }
+        else
+        {
+            chromaPow[(size_t) pitchClassOf (k - 1)] += 0.5 * p;
+            chromaPow[(size_t) pitchClassOf (k + 1)] += 0.5 * p;
+        }
+    }
 
     const double instMax = *std::max_element (chromaPow.begin(), chromaPow.end());
     for (int c = 0; c < CqtFrame::kNumClasses; ++c)

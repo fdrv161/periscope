@@ -1876,9 +1876,14 @@ juce::String SpectrumLens::a11yBandValue (int band) const
 
     const int   floorDb = sets.rangeDb();
     const float w = bandWeight (kThirdOctaveHz[band]);   // Periscope: weighted as the bars are, 0 with Slope
-    if (a11ySpectra >= 2)
-        return a11ytext::T ("L ") + spoken::db (bandDb[0][band] + w, floorDb) + a11ytext::T (", R ") + spoken::db (bandDb[1][band] + w, floorDb);
-    return spoken::db (bandDb[0][band] + w, floorDb);
+    auto t = a11ySpectra >= 2
+           ? a11ytext::T ("L ") + spoken::db (bandDb[0][band] + w, floorDb) + a11ytext::T (", R ") + spoken::db (bandDb[1][band] + w, floorDb)
+           : spoken::db (bandDb[0][band] + w, floorDb);
+    // A band narrower than about three bins is narrower than the window's main lobe: noise reads right there, but a
+    // lone tone spreads past the band edges and reads lower than it is. Say so.
+    if (binHz > 0.0 && bandHi - bandLo < 3.0 * binHz)
+        t << ", " << a11ytext::T ("limited by the FFT size");
+    return t;
 }
 
 juce::String SpectrumLens::a11yControlValue (int item) const

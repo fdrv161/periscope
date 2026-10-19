@@ -389,6 +389,27 @@ TEST_CASE ("telescope: las bandas de un tercio de octava leen lo que tienen que 
     }
 }
 
+// Periscope: a band reads the power of what is in it, whatever the window. A 1 kHz sine of amplitude 0.5 sits well
+// inside the 1 kHz band, so the band must read 20·log10(0.5) = -6.02 dB, the same as the curve's peak on a bin
+// centre; before the ENBW division it read 1.76 dB high with Hann and 3.02 dB with Blackman-Harris.
+TEST_CASE ("telescope: una banda lee lo mismo con cualquier ventana", "[telescope][spectrum]")
+{
+    const double binHz = kSr / 4096.0;
+    const double freq  = 85.0 * binHz;   // 996 Hz, on a bin centre, inside the 1 kHz band (891 to 1122 Hz)
+    for (const int w : { (int) Spectrum::hann, (int) Spectrum::blackmanHarris4, (int) Spectrum::kaiser9 })
+    {
+        auto s = baseSettings();
+        s.window = w;
+        Spectrum m;
+        m.applySettings (s);
+        m.prepare (kSr);
+        feed (m, (long long) kSr, [&] (long long i) { return sinePair (i, freq, 0.5f); });
+        const float band = m.frame().bands[0][16];   // 1 kHz
+        std::printf ("SPEC[banda por ventana] %s: 1 kHz band %+.3f dB (expected -6.021)\n", windowName (w), band);
+        REQUIRE_THAT (band, Catch::Matchers::WithinAbs (-6.0206, 0.05));
+    }
+}
+
 // ============================================================================================ 7 · slope
 TEST_CASE ("telescope: con slope 3 el ruido rosa se ve plano", "[telescope][spectrum]")
 {
