@@ -1018,31 +1018,10 @@ void movingAverage (const std::vector<float>& src, std::vector<float>& dst, int 
     }
 }
 
-// Edges of a stretch or a hump are estimates: two significant digits are what a listener needs (437 Hz -> 440 Hz).
-double roundHz (double f)
-{
-    if (f <= 0.0) return f;
-    const double step = std::pow (10.0, std::floor (std::log10 (f)) - 1.0);
-    return std::round (f / step) * step;
-}
-
-// The number of spoken::hz without its unit, for the first end of a range in the same unit.
-juce::String hzNumber (double f)
-{
-    if (f >= 1000.0) return spoken::trimmed (f / 1000.0, f >= 10000.0 ? 1 : 2);
-    if (f >= 100.0)  return juce::String (juce::roundToInt (f));
-    return spoken::trimmed (f, 1);
-}
-
-// "85 to 400 Hz", "450 Hz to 2 kHz": the unit once when both ends share it.
-juce::String hzRange (double lo, double hi)
-{
-    lo = roundHz (lo);
-    hi = roundHz (hi);
-    if (hi <= lo) return spoken::hz (lo);
-    const bool sameUnit = (lo >= 1000.0) == (hi >= 1000.0);
-    return a11ytext::TF ("{0} to {1}", { sameUnit ? hzNumber (lo) : spoken::hz (lo), spoken::hz (hi) });
-}
+// Periscope: roundHz, hzNumber and hzRange now live in a11y/SpokenFormat.h, shared with Tonal balance.
+using spoken::roundHz;
+using spoken::hzNumber;
+using spoken::hzRange;
 }
 
 int SpectrumLens::a11ySettingItem (int row) const

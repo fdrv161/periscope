@@ -104,6 +104,12 @@ inline const Row* rows() noexcept
         { { "Edit", "Edición", "Edição", "Modification", "Bearbeiten", "Modifica", "Правка" } },
         { { "Read only", "Solo lectura", "Somente leitura", "Lecture seule", "Nur lesen", "Sola lettura", "Только чтение" } },
         { { "Copied", "Copiado", "Copiado", "Copié", "Kopiert", "Copiato", "Скопировано" } },
+        { { "Shape against the reference", nullptr, nullptr, nullptr, nullptr, nullptr, "Форма относительно референса" } },
+        { { "Tilt against the reference", nullptr, nullptr, nullptr, nullptr, nullptr, "Наклон относительно референса" } },
+        { { "all within {0} dB of the reference", nullptr, nullptr, nullptr, nullptr, nullptr, "всё в пределах {0} dB от референса" } },
+        { { "same tilt as the reference", nullptr, nullptr, nullptr, nullptr, nullptr, "наклон как у референса" } },
+        { { "brighter than the reference by {0} dB per octave", nullptr, nullptr, nullptr, nullptr, nullptr, "ярче референса на {0} dB на октаву" } },
+        { { "darker than the reference by {0} dB per octave", nullptr, nullptr, nullptr, nullptr, nullptr, "темнее референса на {0} dB на октаву" } },
         { { "PSR target", "Objetivo de PSR", "Alvo de PSR", "Cible PSR", "PSR-Ziel", "Obiettivo PSR", "Цель PSR" } },
         { { "Crest factor", "Factor de cresta", "Fator de crista", "Facteur de crête", "Crestfaktor", "Fattore di cresta", "Крест-фактор" } },
         { { "Correlation history", "Historial de correlación", "Histórico de correlação", "Historique de corrélation", "Korrelationsverlauf", "Cronologia della correlazione", "История корреляции" } },
@@ -378,5 +384,5 @@ inline const Row* rows() noexcept
     return table;
 }
 
-inline int numRows() noexcept { return 367; }
+inline int numRows() noexcept { return 373; }
 }

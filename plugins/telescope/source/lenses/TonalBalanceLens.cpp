@@ -953,7 +953,8 @@ namespace
 // Periscope: the comparison group sits right after the summary, where the user looks first.
 enum TbGroup { tbSummary = 0, tbCompare, tbBands, tbActions };
 enum TbCompareRow { cmpLoudness = 0, cmpRange, cmpPlr, cmpTruePeak, kNumCompareRows };
-enum TbSummaryRow { rowState = 0, rowReference, rowSection, kSummaryFixedRows };
+// Periscope: rowShape and rowTilt, the first glance at the difference curve, before the single largest bands.
+enum TbSummaryRow { rowState = 0, rowReference, rowSection, rowShape, rowTilt, kSummaryFixedRows };
 enum TbActionRow { actReset = 0, actLoad, actClear, actSectionStart, actSectionEnd, actWholeFile, kNumActions };
 }
 
@@ -1009,6 +1010,8 @@ juce::String TonalBalanceLens::a11yRowName (int group, int row) const
         case rowState:     return a11ytext::T ("State");
         case rowReference: return a11ytext::T ("Reference");
         case rowSection:   return a11ytext::T ("Reference section");
+        case rowShape:     return a11ytext::T ("Shape against the reference");
+        case rowTilt:      return a11ytext::T ("Tilt against the reference");
         default:           return a11ytext::T ("Largest difference ") + juce::String (row - kSummaryFixedRows + 1);
     }
 }
@@ -1041,6 +1044,8 @@ juce::String TonalBalanceLens::a11yRowValue (int group, int row) const
             if (! processor.referenceRange (from, to)) return a11ytext::T ("whole file");
             return mmss (from) + a11ytext::T (" to ") + mmss (to);
         }
+        case rowShape: return data.refValid ? a11yShapeVsReference() : juce::String (a11ytext::T ("no reference loaded"));
+        case rowTilt:  return data.refValid ? a11yTiltVsReference()  : juce::String (a11ytext::T ("no reference loaded"));
         default: break;
     }
 
@@ -1052,6 +1057,70 @@ juce::String TonalBalanceLens::a11yRowValue (int group, int row) const
     const float d = data.deltaDb[b];
     return spoken::hz (kThirdOctaveHz[b]) + ", " + spoken::trimmed (std::abs (d), 1) + a11ytext::T (" dB ")
          + (d >= 0.0f ? a11ytext::T ("louder") : a11ytext::T ("quieter")) + a11ytext::T (" than the reference");
+}
+
+// Periscope: the difference curve in words, as Spectrum's "shape against the line" with the reference in place of
+// the line. Stretches of comparable bands where your mix is 3 dB or more above or below the reference (the band drawn
+// on screen), joined across a single band that falls short, in frequency order, each with its mean difference.
+// The curve is loudness-normalised like the whole lens, so overall level does not show here.
+juce::String TonalBalanceLens::a11yShapeVsReference() const
+{
+    constexpr float kThresholdDb = 3.0f;
+    constexpr int   n = ReferenceFrame::kNumBands;
+    int side[n] {};
+    int compared = 0;
+    for (int b = 0; b < n; ++b)
+    {
+        if (! comparable[b]) continue;
+        ++compared;
+        const float d = data.deltaDb[b];
+        side[b] = d >= kThresholdDb ? 1 : (d <= -kThresholdDb ? -1 : 0);
+    }
+    if (compared == 0) return a11ytext::T ("not enough signal");
+    // A single comparable band that falls short between two bands on the same side does not split the stretch.
+    for (int b = 1; b < n - 1; ++b)
+        if (side[b] == 0 && comparable[b] && side[b - 1] != 0 && side[b - 1] == side[b + 1]
+            && data.deltaDb[b] * (float) side[b - 1] > 0.0f)
+            side[b] = side[b - 1];
+
+    juce::StringArray parts;
+    for (int b = 0; b < n;)
+    {
+        if (side[b] == 0) { ++b; continue; }
+        int e = b;
+        double sum = 0.0;
+        while (e < n && side[e] == side[b]) sum += data.deltaDb[e++];
+        const int last = e - 1;
+        const double lo = kThirdOctaveHz[b] * kSixthDown, hi = kThirdOctaveHz[last] * kSixthUp;
+        const auto where = b == 0 ? a11ytext::TF ("up to {0}", { spoken::hz (spoken::roundHz (hi)) })
+                         : (last == n - 1 ? a11ytext::TF ("above {0}", { spoken::hz (spoken::roundHz (lo)) })
+                                          : spoken::hzRange (lo, hi));
+        parts.add (where + " " + spoken::signedDb ((float) (sum / (e - b))));
+        b = e;
+    }
+    if (parts.isEmpty()) return a11ytext::TF ("all within {0} dB of the reference", { spoken::trimmed (kThresholdDb, 1) });
+    return parts.joinIntoString (", ");
+}
+
+// Periscope: how the difference curve leans, a straight-line fit of the comparable bands from 50 Hz to 10 kHz against
+// octaves, as Spectrum's signal tilt. Positive: your mix is brighter than the reference.
+juce::String TonalBalanceLens::a11yTiltVsReference() const
+{
+    double sx = 0.0, sy = 0.0, sxx = 0.0, sxy = 0.0;
+    int count = 0;
+    for (int b = 0; b < ReferenceFrame::kNumBands; ++b)
+    {
+        if (! comparable[b] || kThirdOctaveHz[b] < 50.0 || kThirdOctaveHz[b] > 10000.0) continue;
+        const double x = std::log2 (kThirdOctaveHz[b] / 1000.0), y = data.deltaDb[b];
+        sx += x; sy += y; sxx += x * x; sxy += x * y; ++count;
+    }
+    const double den = count * sxx - sx * sx;
+    if (count < 6 || den <= 0.0) return a11ytext::T ("not enough signal");
+    const float slope = (float) ((count * sxy - sx * sy) / den);
+    if (std::abs (slope) < 0.25f) return a11ytext::T ("same tilt as the reference");
+    return a11ytext::TF (slope > 0.0f ? "brighter than the reference by {0} dB per octave"
+                                      : "darker than the reference by {0} dB per octave",
+                         { spoken::trimmed (std::abs (slope), 1) });
 }
 
 // Periscope: help for the comparison rows (F1).

@@ -66,6 +66,33 @@ inline juce::String db (float v, int floorDb)
     return dB (v);
 }
 
+// Periscope: moved here from SpectrumLens.cpp so Tonal balance speaks ranges the same way.
+// Edges of a stretch or a hump are estimates: two significant digits are what a listener needs (437 Hz -> 440 Hz).
+inline double roundHz (double f)
+{
+    if (f <= 0.0) return f;
+    const double step = std::pow (10.0, std::floor (std::log10 (f)) - 1.0);
+    return std::round (f / step) * step;
+}
+
+// The number of hz() without its unit, for the first end of a range in the same unit.
+inline juce::String hzNumber (double f)
+{
+    if (f >= 1000.0) return trimmed (f / 1000.0, f >= 10000.0 ? 1 : 2);
+    if (f >= 100.0)  return juce::String (juce::roundToInt (f));
+    return trimmed (f, 1);
+}
+
+// "85 to 400 Hz", "450 Hz to 2 kHz": the unit once when both ends share it.
+inline juce::String hzRange (double lo, double hi)
+{
+    lo = roundHz (lo);
+    hi = roundHz (hi);
+    if (hi <= lo) return hz (lo);
+    const bool sameUnit = (lo >= 1000.0) == (hi >= 1000.0);
+    return TF ("{0} to {1}", { sameUnit ? hzNumber (lo) : hz (lo), hz (hi) });
+}
+
 // Signed value: "+3.2 dB", "-1 dB", "0 dB".
 inline juce::String signedDb (float v)
 {

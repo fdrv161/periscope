@@ -190,6 +190,9 @@ private:
     struct RefLoudness { bool valid = false; float integrated = kSilenceDb, lra = 0.0f, truePeak = kSilenceDb; };
     const RefLoudness& a11yRefLoudness() const;
     juce::String       a11yCompareValue (int row) const;
+    // Periscope: the first glance at the difference curve, as Spectrum's shape and tilt rows against its line.
+    juce::String       a11yShapeVsReference() const;
+    juce::String       a11yTiltVsReference() const;
     mutable RefLoudness  refLoudness;
     mutable juce::uint32 refLoudnessRevision = 0;
     mutable bool         refLoudnessRead = false;
