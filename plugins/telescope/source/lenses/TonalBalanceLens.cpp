@@ -462,7 +462,9 @@ void TonalBalanceLens::paintHead (juce::Graphics& g) const
         const auto span = processor.referenceSpan();
         const double refS = span.whole ? (double) data.refSeconds : span.toS - span.fromS;
         g.setColour (th::txt);
-        g.drawText (juce::String (data.refName) + kDot + juce::String (data.refIntegrated, 1) + " LUFS"
+        // Periscope: refName is UTF-8 (Reference.cpp copyToUTF8); String (const char*) read it as Latin-1, so a Cyrillic
+        // file name showed as "Ð ÐºÐ¾...".
+        g.drawText (juce::String::fromUTF8 (data.refName) + kDot + juce::String (data.refIntegrated, 1) + " LUFS"
                         + kDot + juce::String (refS, 1) + " s",
                     line2, juce::Justification::centredLeft, true);
     }
@@ -1274,6 +1276,10 @@ juce::String TonalBalanceLens::a11yBandValue (int b) const
 
     if (r.comparable)
         t << a11ytext::T (", reference ") << spoken::signedDb (r.refNorm) << a11ytext::T (", difference ") << spoken::signedDb (r.deltaDb);
+    // Periscope: the reference curve is drawn even while the programme is not measured yet (or is below range there);
+    // say its level instead of "no reference in this band", which contradicted the screen.
+    else if (r.refDrawable)
+        t << a11ytext::T (", reference ") << spoken::signedDb (r.refNorm);
     else if (! r.refDrawable && data.refNorm[b] > SpectrumFrame::kFloorDb)
         t << a11ytext::T (", reference below range");
     else
