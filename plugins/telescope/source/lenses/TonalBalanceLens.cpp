@@ -1265,8 +1265,11 @@ juce::String TonalBalanceLens::a11yBandValue (int b) const
     if (! r.valid) return {};
     if (r.bins <= 0.0f) return a11ytext::T ("no FFT bins in this band");
 
+    // Periscope: before the mix has played long enough the screen draws no programme curve at all ("measuring");
+    // "below range" would say the mix is quiet there, when it is simply not measured yet.
     juce::String t = r.liveDrawable ? a11ytext::T ("programme ") + spoken::signedDb (r.liveNorm)
-                                    : juce::String (a11ytext::T ("programme below range"));
+                   : (data.liveValid ? juce::String (a11ytext::T ("programme below range"))
+                                     : juce::String (a11ytext::T ("programme not measured yet")));
     if (! data.refValid) return t;
 
     if (r.comparable)

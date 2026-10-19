@@ -613,30 +613,29 @@ juce::String CqtLens::a11yRowName (int group, int row) const
     return a11ytext::T ("Note ") + juce::String (row - kFirstNoteRow + 1);
 }
 
-// Spectrum peaks by notes: local maxima of the bins (2 bins per semitone), at least a semitone apart,
-// and no more than 40 dB below the loudest.
+// Spectrum peaks by notes: local maxima of the bins (2 bins per semitone), at least a semitone apart.
+// Periscope: only notes above the floor of the plot (the Range setting), as only those have a bar on screen. The old
+// rule "no more than 40 dB below the loudest" named notes near -100 dB on a blank screen and left out a quiet note
+// that was plainly visible.
 std::vector<int> CqtLens::a11yLoudestNotes() const
 {
     std::vector<int> picked;
     const int n = juce::jmin (binsSeen, (int) targetDb.size());
     if (n < 3 || bpoSeen <= 0) return picked;
+    const float floorDb = -(float) a11yRangeDb();
     struct P { int k; float db; };
     std::vector<P> cands;
-    float top = CqtFrame::kFloorDb;
     for (int k = 1; k < n - 1; ++k)
     {
         const float v = targetDb[(size_t) k];
-        if (v > targetDb[(size_t) k - 1] && v >= targetDb[(size_t) k + 1] && v > CqtFrame::kFloorDb + 1.0f)
-        {
+        if (v > targetDb[(size_t) k - 1] && v >= targetDb[(size_t) k + 1] && v > floorDb)
             cands.push_back ({ k, v });
-            top = juce::jmax (top, v);
-        }
     }
     std::sort (cands.begin(), cands.end(), [] (const P& a, const P& b) { return a.db > b.db; });
     const int minSep = juce::jmax (1, bpoSeen / 12);
     for (const auto& c : cands)
     {
-        if ((int) picked.size() >= kA11yNotes || c.db < top - 40.0f) break;
+        if ((int) picked.size() >= kA11yNotes) break;
         if (std::none_of (picked.begin(), picked.end(), [&c, minSep] (int k) { return std::abs (k - c.k) < minSep; }))
             picked.push_back (c.k);
     }
@@ -669,7 +668,13 @@ juce::String CqtLens::a11yRowValue (int group, int row) const
     const int k = picked[(size_t) i];
     const double hz = (double) fMinSeen * std::pow (2.0, (double) k / (double) bpoSeen);
     return spoken::noteWithCents (noteForFrequency (hz)) + ", " + spoken::hz (hz) + ", "
-         + spoken::trimmed (targetDb[(size_t) k], 1) + a11ytext::T (" dB");
+         + spoken::db (targetDb[(size_t) k], a11yRangeDb());
+}
+
+// Periscope: the floor of the plot, the Range the bars are drawn against (lastRangeDb once painted).
+int CqtLens::a11yRangeDb() const
+{
+    return lastRangeDb > 0 ? lastRangeDb : processor.spectrumSettings().rangeDb();
 }
 
 bool CqtLens::a11yIsAdjustable (int group, int row) const

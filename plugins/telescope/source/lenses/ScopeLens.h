@@ -294,6 +294,8 @@ private:
     ScopeFrame   scope {};        // último ScopeFrame leído (copia: la lente lo dibuja a su ritmo)
     float        corr = 0.0f, width = 0.0f, balanceDb = 0.0f, monoLossDb = 0.0f, windowSec = 0.0f;
     static constexpr size_t kCorrHistory = 100;   // accessibility: 10 seconds at ten values a second
+    static constexpr float  kQuietCorr   = 2.0f;  // Periscope: a quiet moment in corrHistory (outside -1..+1)
+    bool isQuiet() const;                         // Periscope: as paintStereoNumbers decides "no signal"
     std::vector<float> corrHistory;
     juce::uint32 corrLastMs = 0;
     float        dispCorr = 0.0f;   // el correlímetro se suaviza; los demás números son lectura directa

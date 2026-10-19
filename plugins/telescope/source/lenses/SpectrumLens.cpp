@@ -1090,6 +1090,23 @@ juce::String SpectrumLens::a11yRowValue (int group, int row) const
     {
         const double hz = midiHz (probeMidi);
         auto t = spoken::hz (hz) + ", " + spoken::note (noteFor (hz)) + ", " + a11yLevels (hz, true);
+        // Periscope: in bar mode the screen and the mouse readout show the bar under the cursor, not the FFT curve;
+        // say that bar too, from the same data and the same rule as readoutAtX (first channel, weighted).
+        if (sets.bandsMode != Spectrum::bandsFft)
+        {
+            const bool third = sets.bandsMode == Spectrum::bandsThird;
+            const int  nb = third ? SpectrumFrame::kNumThird : SpectrumFrame::kNumBark;
+            constexpr double kSixthDown = 0.8908987181403393, kSixthUp = 1.1224620483093730;
+            for (int b = 0; b < nb; ++b)
+            {
+                const double blo = third ? kThirdOctaveHz[b] * kSixthDown : kBarkEdgesHz[b];
+                const double bhi = third ? kThirdOctaveHz[b] * kSixthUp   : kBarkEdgesHz[b + 1];
+                if (hz < blo || hz >= bhi) continue;
+                const float bar = (third ? bandDb[0][b] : barkDb[0][b]) + bandWeight (third ? kThirdOctaveHz[b] : std::sqrt (blo * bhi));
+                t << ", " << a11ytext::TF ("bar {0}", { spoken::db (bar, sets.rangeDb()) });
+                break;
+            }
+        }
         const auto line = a11yLineDeviation (hz);
         if (line.isNotEmpty()) t << ", " << line;
         const auto mask = a11yMaskAt (hz);   // Periscope: as the overlay shows it under the probe
@@ -1720,7 +1737,31 @@ const SpectrumLens::A11yShape& SpectrumLens::a11yShape() const
         const int   w  = windowAt (i);
         const int   lo = juce::jmax (0, i - w), hi = juce::jmin (n - 1, i + w);
         const float v  = view[(size_t) i];
-        if (denom <= 0) return dip ? medianOf (view, lo, hi, scratch) - v : v - medianOf (view, lo, hi, scratch);
+        if (denom <= 0)
+        {
+            // Periscope: the median leaves out the window's main lobe around the candidate (2.5 bins for Hann, 4.5 for
+            // the others), or with FFT 1024 a 60 Hz tone's lobe still filled half the neighbourhood and the median sat on
+            // the hump. At the 20 Hz edge only the other side may remain; if nothing remains, the whole window is used.
+            float m = 0.0f;
+            bool  got = false;
+            if (binHz > 0.0)
+            {
+                const double lobeBins = sets.window == Spectrum::hann ? 2.5 : 4.5;
+                const int    gap = (int) std::lround (lobeBins * binHz * kGridPerOct / (gridHz (i) * std::log (2.0)));
+                scratch.clear();
+                for (int j = lo; j <= hi; ++j)
+                    if (std::abs (j - i) > gap) scratch.push_back (view[(size_t) j]);
+                if (! scratch.empty())
+                {
+                    const auto mid = scratch.begin() + (std::ptrdiff_t) (scratch.size() / 2);
+                    std::nth_element (scratch.begin(), mid, scratch.end());
+                    m = *mid;
+                    got = true;
+                }
+            }
+            if (! got) m = medianOf (view, lo, hi, scratch);
+            return dip ? m - v : v - m;
+        }
         const auto sideBase = [&] (int step)
         {
             float extreme = v;
@@ -1825,6 +1866,14 @@ const SpectrumLens::A11yShape& SpectrumLens::a11yShape() const
 
 juce::String SpectrumLens::a11yBandValue (int band) const
 {
+    // Periscope: a band with no FFT bin inside (40 Hz at 48 kHz and FFT 4096) is drawn as "not measurable", not as a
+    // bar at the floor; speech said "below -90 dB", as if it were silent. Same test as paintBars.
+    constexpr double kSixthDown = 0.8908987181403393, kSixthUp = 1.1224620483093730;   // 2^(-1/6), 2^(+1/6)
+    const double binHz = fftSizeSeen > 0 ? srSeen / (double) fftSizeSeen : 0.0;
+    const double bandLo = kThirdOctaveHz[band] * kSixthDown, bandHi = kThirdOctaveHz[band] * kSixthUp;
+    if (binHz > 0.0 && std::ceil (bandHi / binHz) <= std::ceil (bandLo / binHz))
+        return a11ytext::T ("not measurable at this FFT size");
+
     const int   floorDb = sets.rangeDb();
     const float w = bandWeight (kThirdOctaveHz[band]);   // Periscope: weighted as the bars are, 0 with Slope
     if (a11ySpectra >= 2)

@@ -104,6 +104,7 @@ public:
     // La segunda línea de la cabecera (los segundos analizados, contra qué se comparó, el TP) tal como se
     // dibuja. Vacía mientras no hubo audio: pública para que el test lea lo mismo que se pinta.
     juce::String headSubText() const;
+    juce::String headTopText() const;   // Periscope: the tabular header line, shared by the screen and speech
     // La TONALIDAD tal como sale en la cabecera. Pública para que el test la compare, para las seis
     // lenguas y las veinticuatro tonalidades, contra la que dibuja CQT en su pie.
     static juce::String keyText (int tonic, int mode, const juce::String& language);

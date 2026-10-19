@@ -1324,7 +1324,8 @@ constexpr int    kOctaves = 10;
 constexpr double kOctaveHz[kOctaves] = { 31.5, 63.0, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0 };
 constexpr float  kSilentEnergy = 1.0e-12f;
 
-struct OctaveStats { float energy = 0.0f, centre = 0.0f, from = 0.0f, to = 0.0f; };
+// Periscope: peakCell, the brightest cell of the octave, to tell whether the screen shows it at all.
+struct OctaveStats { float energy = 0.0f, centre = 0.0f, from = 0.0f, to = 0.0f, peakCell = 0.0f; };
 
 OctaveStats octaveStats (const std::vector<float>& grid, int octave)
 {
@@ -1337,7 +1338,12 @@ OctaveStats octaveStats (const std::vector<float>& grid, int octave)
     {
         const double f = FieldFrame::rowFrequency (r);
         if (f < lo || f >= hi) continue;
-        for (int c = 0; c < FieldFrame::kDir; ++c) col[c] += grid[(size_t) r * FieldFrame::kDir + (size_t) c];
+        for (int c = 0; c < FieldFrame::kDir; ++c)
+        {
+            const float v = grid[(size_t) r * FieldFrame::kDir + (size_t) c];
+            col[c] += v;
+            s.peakCell = std::max (s.peakCell, v);
+        }
     }
 
     double weighted = 0.0;
@@ -1411,6 +1417,10 @@ juce::String FieldLens::a11yRowValue (int group, int row) const
         t << a11ytext::T (", spread from ") << spoken::pan (s.from) << a11ytext::T (" to ") << spoken::pan (s.to);
     else
         t << a11ytext::T (", narrow");
+    // Periscope: a cell more than 45 dB under the brightness reference is not drawn, so an octave whose brightest cell is
+    // that quiet is empty on screen; say so instead of describing what nobody can see.
+    if (norm > 0.0f && s.peakCell <= norm * std::pow (10.0f, kFloorDbRel / 10.0f))
+        t << ", " << a11ytext::T ("too quiet to show");
     return t;
 }
 

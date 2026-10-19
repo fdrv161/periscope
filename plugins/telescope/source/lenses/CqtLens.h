@@ -146,6 +146,7 @@ private:
     int   probeMidi = 69;            // 69 = A 4, 440 Hz
     bool  cursorToProbe = false;     // Enter on a note asked the readings cursor to go to the probe
     std::vector<int> a11yLoudestNotes() const;   // the bins of the loudest notes, loudest first
+    int a11yRangeDb() const;                     // Periscope: the floor of the plot in dB
     void  a11yShowProbe();           // the crosshair follows the probe, for a sighted helper
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CqtLens)

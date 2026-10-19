@@ -981,7 +981,7 @@ bool ScopeLens::advanceFrame()
     if (! processor.isAnalysisPaused() && nowMs - corrLastMs >= 100)
     {
         corrLastMs = nowMs;
-        corrHistory.push_back (corr);
+        corrHistory.push_back (isQuiet() ? kQuietCorr : corr);   // Periscope: quiet moments are not "very wide"
         if (corrHistory.size() > kCorrHistory) corrHistory.erase (corrHistory.begin());
     }
 
@@ -1140,6 +1140,14 @@ juce::String ScopeLens::a11yRowValue (int group, int row) const
         case srPicture:    return a11yPictureValue();
         case srCorrHistory: return a11yCorrHistoryValue();
         case srDirections: return a11yDirectionsValue();
+        default: break;
+    }
+    // Periscope: in silence the screen writes "no signal" in these cells (Hemisphere) instead of zeros; "centred" and
+    // "0 dB" would read as a measured mono mix.
+    if (isQuiet() && (row == srCorr || row == srWidth || row == srBalance || row == srMonoLoss || row == srOutOfPhase))
+        return a11ytext::T ("no signal");
+    switch (row)
+    {
         case srCorr:       return spoken::correlation (corr);
         case srWidth:      return spoken::trimmed (width, 2);
         case srBalance:    return spoken::balance (balanceDb);
@@ -1180,23 +1188,44 @@ juce::String ScopeLens::a11yCorrHistoryValue() const
 // the time below zero and the lowest value follow.
 juce::String ScopeLens::a11yPictureValue() const
 {
-    std::vector<float> v (corrHistory.begin(), corrHistory.end());
-    if (v.empty()) v.push_back (corr);
+    // Periscope: quiet moments are kept out (they are marked kQuietCorr): the screen shows an empty goniometer there,
+    // and the engine's correlation of 0 would have read as "very wide".
+    std::vector<float> v;
+    for (auto c : corrHistory) if (c <= 1.0f) v.push_back (c);
+    if (v.empty())
+    {
+        if (isQuiet()) return a11ytext::T ("no signal");
+        v.push_back (corr);
+    }
     std::vector<float> sorted (v);
     std::sort (sorted.begin(), sorted.end());
     const float median = sorted[sorted.size() / 2];
+
+    // Periscope: one channel alone is a line at 45 degrees on screen, not a wide cloud; a much quieter copy in the other
+    // channel is a line leaning to one side, not "almost mono". The balance says which (+ is the right side louder).
+    if (std::abs (balanceDb) >= 20.0f)
+        return a11ytext::T (balanceDb > 0.0f ? "one channel only, right" : "one channel only, left");
 
     static const char* const names[] = { "like a flipped polarity, the mix cancels in mono",
                                          "out of phase, wider than the speakers, thin in mono",
                                          "very wide", "normal stereo", "almost mono" };
     const char* word = names[median <= -0.5f ? 0 : (median < 0.0f ? 1 : (median < 0.3f ? 2 : (median < 0.9f ? 3 : 4)))];
+    auto t = a11ytext::T (word);
+    if (std::abs (balanceDb) >= 6.0f)
+        t << ", " << a11ytext::T (balanceDb > 0.0f ? "leaning right" : "leaning left");
     int below = 0;
     for (auto c : v) if (c < 0.0f) ++below;
     const int pct = juce::roundToInt (100.0 * below / (double) v.size());
     const auto secs = spoken::duration (std::round ((double) v.size() / 10.0));
-    return a11ytext::T (word) + ", "
+    return t + ", "
          + a11ytext::TF ("over {0}: below zero {1} percent of the time, lowest {2}",
                          { secs, juce::String (pct), spoken::trimmed (sorted.front(), 2) });
+}
+
+// Periscope: the same "quiet" as paintStereoNumbers, which writes "no signal" in its cells.
+bool ScopeLens::isQuiet() const
+{
+    return scope.xyCount <= 0 || gonioPeak <= kGonioMinPeak + 1.0e-6f;
 }
 
 // In Hemisphere mode the screen shows how much energy sits in each pan direction: the filled half circle, its

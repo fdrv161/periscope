@@ -589,9 +589,7 @@ void VerdictLens::paintHead (juce::Graphics& g) const
 
     // LA CABECERA TABULAR (spec §5.8): I · LRA · PLR · correlación · tonalidad. Es el contexto sin el cual
     // las frases de abajo no significan nada — y es lo único que se muestra sin regla, porque son las
-    // mediciones mismas.
-    const auto lang = processor.verdictLanguage();
-    const auto key = keyText (s.keyTonic, s.keyMode, lang);
+    // mediciones mismas. Periscope: the text itself is built in headTopText, which speech reads too.
 
     // F5 (D-122): sin audio sobre la compuerta, la cabecera muestra SÓLO el estado. Las dos líneas de números
     // dejan su lugar vacío (el estado no salta de renglón): con ceros no hay nada que resumir.
@@ -599,13 +597,7 @@ void VerdictLens::paintHead (juce::Graphics& g) const
     const auto subRow = area.removeFromTop (14);
     if (s.heard)
     {
-        juce::String top;
-        top << "I " << (s.integrated <= kSilenceDb + 1.0f ? juce::String ("--") : signed1 (s.integrated)) << " LUFS"
-            << kDot << "LRA " << juce::String (s.lra, 1) << " LU"
-            << kDot << "PLR " << juce::String (s.plr, 1) << " dB"
-            << kDot << "corr " << juce::String (s.corr, 2)
-            << kDot << key;
-        look::drawTextLine (g, top, topRow, juce::Justification::centredLeft);
+        look::drawTextLine (g, headTopText(), topRow, juce::Justification::centredLeft);
 
         g.setFont (look::tabularFont (m.textSmall));
         g.setColour (look::txtSecondary);
@@ -615,6 +607,21 @@ void VerdictLens::paintHead (juce::Graphics& g) const
     g.setFont (look::tabularFont (m.textSmall));   // el estado, en el cuerpo chico haya o no números arriba
     g.setColour (look::txtTertiary);
     look::drawTextLine (g, stateText(), area, juce::Justification::centredLeft);
+}
+
+// Periscope: the tabular header line, moved out of paintHead unchanged so speech can read the same text.
+juce::String VerdictLens::headTopText() const
+{
+    const auto& s = rep.summary;
+    if (! s.heard) return {};
+    const auto key = keyText (s.keyTonic, s.keyMode, processor.verdictLanguage());
+    juce::String top;
+    top << "I " << (s.integrated <= kSilenceDb + 1.0f ? juce::String ("--") : signed1 (s.integrated)) << " LUFS"
+        << kDot << "LRA " << juce::String (s.lra, 1) << " LU"
+        << kDot << "PLR " << juce::String (s.plr, 1) << " dB"
+        << kDot << "corr " << juce::String (s.corr, 2)
+        << kDot << key;
+    return top;
 }
 
 // Cuántos segundos, y CONTRA QUÉ se comparó la sección 1. Lo segundo no es un detalle: es la diferencia entre
@@ -857,7 +864,8 @@ juce::String VerdictLens::a11yGroupName (int group) const
 
 int VerdictLens::a11yRowCount (int group) const
 {
-    if (group == gSummary) return 2;
+    // Periscope: + Measurements and Comparison basis, the two header lines the screen shows above the findings.
+    if (group == gSummary) return 4;
     if (group == gActions) return kNumControls;
     // An empty section is one row that says so.
     return juce::jmax (1, (int) a11yFindings (group).size());
@@ -865,7 +873,11 @@ int VerdictLens::a11yRowCount (int group) const
 
 juce::String VerdictLens::a11yRowName (int group, int row) const
 {
-    if (group == gSummary) return row == 0 ? a11ytext::T ("State") : a11ytext::T ("Result");
+    if (group == gSummary)
+    {
+        static const char* const names[] = { "State", "Result", "Measurements", "Comparison basis" };
+        return a11ytext::T (names[juce::jlimit (0, 3, row)]);
+    }
     if (group == gActions)
     {
         switch (row)
@@ -891,6 +903,11 @@ juce::String VerdictLens::a11yRowValue (int group, int row) const
     if (group == gSummary)
     {
         if (row == 0) return spoken::clean (stateText());
+        if (row == 2 || row == 3)
+        {
+            const auto line = row == 2 ? headTopText() : headSubText();
+            return line.isEmpty() ? juce::String (a11ytext::T ("nothing analysed yet")) : spoken::clean (line);
+        }
         const auto h = headlineText();
         return h.isEmpty() ? juce::String (a11ytext::T ("nothing analysed yet")) : spoken::clean (h);
     }

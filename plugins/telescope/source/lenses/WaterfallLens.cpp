@@ -667,10 +667,23 @@ juce::String WaterfallLens::a11yRowValue (int group, int row) const
 {
     if (group == 0)
     {
-        // The front line is the newest column of the ring: one column, the loudest point within a quarter tone.
-        const auto cell = sonoprobe::cellAt (processor.spectrogram(), 0.0, 0.0, probe.hz());
-        if (! cell.valid) return a11ytext::T ("no data yet");
-        return spoken::hz (probe.hz()) + ", " + sonoprobe::levelText (cell.level, processor.spectrumSettings().rangeDb())
+        // The front line is the newest column of the ring, the loudest point within a quarter tone. Periscope: read through
+        // readLine, the same row pairs and the same smoothing the picture and the mouse readout use. The raw ring kept
+        // narrow high tones that the drawn line shows far lower (about 30 dB at 12 kHz), so speech and screen disagreed.
+        // The exact level of a tone is the Spectrogram probe's job.
+        const auto& ring = processor.spectrogram();
+        juce::uint8 pts[kMaxPoints];
+        if (ring.count() <= 0 || ! readLine (ring.writeIndex() - 1, pts)) return a11ytext::T ("no data yet");
+        const double octaves = std::log2 (SpectrogramRing::kMaxHz / SpectrogramRing::kMinHz);
+        const double centre  = (double) (kRows - 1)
+                             * std::log2 (juce::jlimit (SpectrogramRing::kMinHz, SpectrogramRing::kMaxHz, probe.hz()) / SpectrogramRing::kMinHz)
+                             / octaves;
+        const double quarter = (double) (kRows - 1) / (24.0 * octaves);
+        const int jlo = juce::jlimit (0, kMaxPoints - 1, (int) std::ceil (centre - quarter) / 2);
+        const int jhi = juce::jlimit (jlo, kMaxPoints - 1, (int) std::floor (centre + quarter) / 2);
+        int level = 0;
+        for (int j = jlo; j <= jhi; ++j) level = juce::jmax (level, (int) pts[j]);
+        return spoken::hz (probe.hz()) + ", " + sonoprobe::levelText (level, processor.spectrumSettings().rangeDb())
              + ", " + a11ytext::T ("now");
     }
     const auto s = processor.spectrumSettings();
@@ -727,7 +740,8 @@ juce::String WaterfallLens::a11yRowHelp (int group, int) const
     static const char* const helps[] = {
         "Probe: what the mouse shows on the front line, the newest one: frequency and level now. Plus and minus move "
         "it a semitone, Alt with Page Up or Page Down an octave. The lines behind are the past and cannot be read one "
-        "by one; the Spectrogram lens shows the same data, and its probe reaches back in time."
+        "by one; the Spectrogram lens shows the same data, and its probe reaches back in time. The line is smoothed as "
+        "drawn, so a narrow tone reads lower than its true level; the Spectrogram probe gives a tone's exact level."
     };
     return a11ytext::T (helps[0]);
 }
