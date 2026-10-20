@@ -20,6 +20,13 @@ Install on Windows: extract the ZIP and copy the `Periscope.vst3` folder into `C
 
 Also in [Russian (Русский)](MANUAL.ru.md) and [Spanish (Español)](MANUAL.es.md). The English manual is the main version; the translations are updated together with it.
 
+## What's new in 1.4.0
+
+- **Shape and tilt against the reference** in Tonal balance, with the Q key for the matching EQ bell or shelf.
+- **Third-octave and Bark bars read the true band level**, the same with every window.
+- **Chromagram and key**: no leak a semitone down, so recordings tuned a little flat land on the right notes.
+- **Long sessions**: integrated loudness and loudness range no longer slow down without a reset.
+
 ## What's new in 1.3.0
 
 - **Comparison with the reference** in Tonal balance: how much to turn the reference down or up so both play equally loud, plus loudness range, PLR and true peak, yours and the reference's.
