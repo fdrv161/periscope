@@ -20,6 +20,10 @@ Install on Windows: extract the ZIP and copy the `Periscope.vst3` folder into `C
 
 Also in [Russian (Русский)](MANUAL.ru.md) and [Spanish (Español)](MANUAL.es.md). The English manual is the main version; the translations are updated together with it.
 
+## What's new in 1.4.1
+
+- Fixed: removing Periscope with NVDA running stalled REAPER and could leave REAPER and other plugins without screen reader access (a JUCE issue, fixed the same way JUCE fixed it).
+
 ## What's new in 1.4.0
 
 - **Shape and tilt against the reference** in Tonal balance, with the Q key for the matching EQ bell or shelf.
