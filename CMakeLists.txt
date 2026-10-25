@@ -85,6 +85,14 @@ else ()
     FetchContent_MakeAvailable(JUCE)
 endif ()
 
+# Periscope: JUCE's UiaDisconnectAllProviders hang fix (cmake/PatchJuceUia.cmake). A local checkout is patched too.
+include("${CMAKE_CURRENT_LIST_DIR}/cmake/PatchJuceUia.cmake")
+if (OVNI_JUCE_DIR AND EXISTS "${OVNI_JUCE_DIR}/CMakeLists.txt")
+    ovni_patch_juce_uia("${OVNI_JUCE_DIR}")
+else ()
+    ovni_patch_juce_uia("${juce_SOURCE_DIR}")
+endif ()
+
 # ---------------------------------------------------------------------------------------------
 # 2. libmysofa v1.3.4 — provee mysofa-static para ovni_dsp/SofaLoader (forward-looking: binaurales).
 #    Reusar checkout: -DFETCHCONTENT_SOURCE_DIR_LIBMYSOFA=/ruta/a/libmysofa-src
