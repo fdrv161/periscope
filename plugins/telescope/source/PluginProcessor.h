@@ -316,6 +316,8 @@ protected:
     void prepareEngine (const juce::dsp::ProcessSpec& spec) override;
     // Periscope (audit M3): A/B and user presets replace the whole state; the engine must hear about it.
     void stateReplaced() override { syncLensSettings(); }
+    // Periscope: an analyser never changes the sound (In, Out and In Phase of the base are inert here).
+    bool isListenOnly() const override { return true; }
 
 private:
     // Fija los defaults que falten en el ValueTree y empuja TODOS los settings al motor. Se llama al

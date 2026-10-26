@@ -52,6 +52,11 @@ public:
     // (toggle del power + estado del LED). Sobreescribilo si tu layout usa otro id.
     virtual juce::String bypassParamID() const { return "bypass"; }
 
+    // Periscope: true for a plugin that only listens (an analyser). The base then never changes the audio: the
+    // utility parameters In, Out and In Phase stay in the layout (old projects and automation load as before) but do
+    // nothing, and a mono input is passed to both outputs, as the bypass does.
+    virtual bool isListenOnly() const { return false; }
+
     //==================================================================================== AudioProcessor
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override {}

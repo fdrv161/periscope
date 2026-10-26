@@ -136,6 +136,17 @@ void PluginProcessorBase::processBlock (juce::AudioBuffer<float>& buffer, juce::
             return;
         }
 
+    // Periscope: a listen-only plugin measures the input as it is and hands it on untouched (see isListenOnly).
+    if (isListenOnly())
+    {
+        processAudio (buffer, midi);
+        if (numOut > 1 && numIn == 1)
+            buffer.copyFrom (1, 0, buffer, 0, 0, buffer.getNumSamples());
+        uiOutPeak.store (buffer.getMagnitude (0, buffer.getNumSamples()), std::memory_order_relaxed);
+        uiClip.store (0.0f, std::memory_order_relaxed);
+        return;
+    }
+
     // ===== IN gain (drive) — rampeado por-bloque (anti-zipper); sólo en el camino activo. =====
     {
         const float inG = pInGain ? juce::Decibels::decibelsToGain (pInGain->load()) : 1.0f;
