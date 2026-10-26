@@ -1,4 +1,5 @@
 #include "analysis/RangeAnalysis.h"
+#include "analysis/SampleGuard.h"
 #include <algorithm>
 #include <cmath>
 
@@ -171,6 +172,9 @@ RangeMeasurement RangeAnalyzer::measure (const juce::File& f,
         const float* src1 = numCh > 1 ? block.getReadPointer (1) : src0;
         std::copy (src0, src0 + n, chunkL.begin());
         std::copy (src1, src1 + n, chunkR.begin());
+        // Periscope: a float file with NaN or infinity is measured like the live input (see SampleGuard.h).
+        sanitiseForAnalysis (chunkL.data(), n);
+        sanitiseForAnalysis (chunkR.data(), n);
 
         // ---- el estéreo de banda ancha del tramo: las tres sumas, en orden (ver RangeAnalysis.h) ----
         for (int i = 0; i < n; ++i)

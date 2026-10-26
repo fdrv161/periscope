@@ -1,5 +1,6 @@
 # Periscope: backport of JUCE commit "Accessibility (Windows): Guard UiaDisconnectAllProviders so that it is only
-# called in standalone apps" (develop, 2026-07-24), which JUCE 8.0.13 does not have.
+# called in standalone apps" (develop, 2026-07-24), which JUCE 8.0.13 does not have. Part 3 below backports a second
+# Windows accessibility fix of the same kind.
 #
 # Why: when the last plugin instance unloads, JUCE's ~WindowsUIAWrapper calls UiaDisconnectAllProviders. That cuts
 # off EVERY UI Automation provider in the host process (REAPER's and other plugins'), and with NVDA running it can
@@ -40,5 +41,28 @@ function (ovni_patch_juce_uia juce_dir)
         string(REPLACE "${old}" "if (providerCount == 0)" text "${text}")
         file(WRITE "${impl}" "${text}")
         message(STATUS "[ovni] JUCE UIA patch applied to juce_Accessibility_windows.cpp")
+    endif ()
+
+    # 3. Backport of JUCE commit 09395658a8 (develop, 2026-10-07), "Windows: Fix potential crash when dereferencing a
+    # deleted accessibilityHandler". The UIA provider object can outlive its JUCE handler (NVDA keeps references),
+    # and get_ProviderOptions used the handler without checking it first: an access violation that takes REAPER down.
+    set(element "${native}/juce_AccessibilityElement_windows.cpp")
+    file(READ "${element}" text)
+    # One line only, in 8.0.13 the only place with exactly this text: a match across lines would depend on the line
+    # endings git gives the checkout.
+    set(old "if (AccessibilityHandler::getNativeChildForComponent (accessibilityHandler.getComponent()) != nullptr)")
+    set(fixed "if (isElementValid() && AccessibilityHandler::getNativeChildForComponent (accessibilityHandler.getComponent()) != nullptr)")
+    string(FIND "${text}" "${old}" at)
+    if (NOT at EQUAL -1)
+        string(REPLACE "${old}" "${fixed}" text "${text}")
+        file(WRITE "${element}" "${text}")
+        message(STATUS "[ovni] JUCE UIA patch applied to juce_AccessibilityElement_windows.cpp")
+    else ()
+        # Already patched, or a JUCE with the upstream fix (it puts the same condition after "&& "). Anything else
+        # must stop the build.
+        string(FIND "${text}" "&& AccessibilityHandler::getNativeChildForComponent (accessibilityHandler.getComponent()) != nullptr" guarded)
+        if (guarded EQUAL -1)
+            message(FATAL_ERROR "[ovni] JUCE UIA patch: get_ProviderOptions not found in ${element}")
+        endif ()
     endif ()
 endfunction ()

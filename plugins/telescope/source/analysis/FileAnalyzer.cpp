@@ -86,6 +86,8 @@ void FileAnalyzer::publish (const RangeMeasurement& m)
 
 void FileAnalyzer::run()
 {
+    // Periscope: denormals flushed as on the live analysis thread (AnalysisThread::run), so both give the same rows.
+    const juce::ScopedNoDenormals noDenormals;
     const auto m = analyse (pending);
 
     // Periscope: a cancelled run is not a result. Publishing it replaced the previous result with an invalid

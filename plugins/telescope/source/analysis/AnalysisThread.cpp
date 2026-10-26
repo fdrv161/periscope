@@ -1,5 +1,6 @@
 #include "analysis/AnalysisThread.h"
 #include "analysis/ThreadStop.h"
+#include "analysis/SampleGuard.h"
 #include <cmath>
 
 namespace telescope
@@ -604,6 +605,11 @@ void AnalysisThread::processHop()
 
 void AnalysisThread::run()
 {
+    // Periscope: flush denormals on this thread too (the audio thread's ScopedNoDenormals does not reach here). In long
+    // silences the decaying stores (spectrum averages, the Field grid) pass through the subnormal range, where x64
+    // arithmetic is many times slower. FileAnalyzer::run does the same, so live and file rows stay identical.
+    const juce::ScopedNoDenormals noDenormals;
+
     while (! threadShouldExit())
     {
         if (resetRequested.exchange (false, std::memory_order_acq_rel))
@@ -618,6 +624,10 @@ void AnalysisThread::run()
             wait (10);   // ms — nada que analizar todavía
             continue;
         }
+
+        // Periscope: NaN, infinity and absurd values never reach the modules (see SampleGuard.h).
+        sanitiseForAnalysis (chunkL.data(), got);
+        sanitiseForAnalysis (chunkR.data(), got);
 
         // En pausa se DRENA igual (para que el bus no se desborde y el contador de descartes no mienta),
         // pero no se integra ni se publica: el frame queda congelado.
