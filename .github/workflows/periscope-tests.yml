@@ -1,0 +1,82 @@
+# Builds and runs Periscope's own C++ test suite (OvniTelescopeTests) on Windows x64.
+# Separate from the plugin build on purpose: the artifact for testing by hand never waits for it.
+# Runs on every push to the accessible branch and manually (Actions -> Run workflow). The manual run can rewrite the
+# golden dumps (TELESCOPE_GOLDEN_WRITE=1) and upload them, so an intended change of results can be reviewed and committed.
+name: Periscope tests
+
+on:
+  push:
+    branches: [accessible]
+  workflow_dispatch:
+    inputs:
+      golden_write:
+        description: "Rewrite the golden dumps and upload them (for an intended change of results)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: periscope-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: OvniTelescopeTests (Windows x64)
+    runs-on: windows-2022
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Its own key: this build also fetches Catch2, and the plugin build's cache must not change under it.
+      - name: Cache FetchContent deps
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: deps-windows-tests-${{ github.event.repository.name }}-${{ hashFiles('CMakeLists.txt') }}
+          restore-keys: |
+            deps-windows-tests-${{ github.event.repository.name }}-
+
+      - name: Configure
+        run: >
+          cmake -B build -G "Visual Studio 17 2022" -A x64
+          -DCMAKE_BUILD_TYPE=Release
+          -DOVNI_BUILD_TESTS=ON
+          -DOVNI_WITH_SOFA=OFF
+          .
+
+      - name: Build OvniTelescopeTests
+        run: cmake --build build --config Release --target OvniTelescopeTests
+
+      - name: Run tests
+        run: |
+          set -o pipefail
+          exe=$(find build -type f -name 'OvniTelescopeTests.exe' -path '*Release*' | head -1)
+          [ -n "$exe" ] || { echo "OvniTelescopeTests.exe not found"; exit 1; }
+          if [ "${{ inputs.golden_write }}" = "true" ]; then export TELESCOPE_GOLDEN_WRITE=1; fi
+          "$exe" --reporter console --reporter "junit::out=test-results.xml" 2>&1 | tee test-output.txt
+
+      - name: Upload test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: periscope-test-output
+          path: |
+            test-output.txt
+            test-results.xml
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload rewritten golden dumps
+        if: always() && inputs.golden_write
+        uses: actions/upload-artifact@v4
+        with:
+          name: periscope-golden
+          path: plugins/telescope/tests/golden
+          retention-days: 14
