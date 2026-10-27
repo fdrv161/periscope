@@ -56,7 +56,9 @@ bool isUpperLetter (juce::juce_wchar c) noexcept { return (c >= 'A' && c <= 'Z')
 // Fuera de ASCII y Latin-1: Œ œ Ÿ son letras que la tabla conoce; la raya y el menos de las frases no son letras.
 // Cualquier otro carácter de ahí arriba en un título es una letra que look::upper no sabe subir (un idioma nuevo
 // con «ł» o «ő»): rojo, en vez de pasar por no mirarlo.
-bool isKnownChar (juce::juce_wchar c) noexcept { return c <= 0xFF || c == 0x152 || c == 0x153 || c == 0x178 || c == 0x2014 || c == 0x2212; }
+// Periscope: plus the Cyrillic block, for the Russian titles (look::upper handles it).
+bool isKnownChar (juce::juce_wchar c) noexcept { return c <= 0xFF || c == 0x152 || c == 0x153 || c == 0x178 || c == 0x2014 || c == 0x2212
+                                                        || (c >= 0x400 && c <= 0x45F); }
 
 bool hasLower (const juce::String& s)
 {

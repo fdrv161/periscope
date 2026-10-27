@@ -237,15 +237,28 @@ TEST_CASE ("telescope: los estados de TONAL BALANCE se dicen con palabras", "[te
         return mb;
     }();
     big.deleteFile();
-    proc.setStateInformation (state.getData(), (int) state.getSize());
-    lens.pumpFrames (2);
 
-    const auto faltante = lens.stateText();
+    // Periscope (audit M8): the same instance keeps the reference it already analysed when the same state comes back
+    // (REAPER restores the state on every undo, and the disk is not read for that). A missing file is reported when a
+    // project is opened, i.e. by a new instance, so that is what is checked here.
+    proc.setStateInformation (state.getData(), (int) state.getSize());
+    REQUIRE (proc.referenceMissingName().isEmpty());
+
+    telescope::TelescopeProcessor reopened;
+    reopened.prepareToPlay (kSr, 512);
+    reopened.setEnabledModules (telescope::kSpectrum | telescope::kReference | telescope::kLoudness);
+    reopened.setStateInformation (state.getData(), (int) state.getSize());
+    TonalBalanceLens reopenedLens (reopened);
+    reopenedLens.setSize (900, 600);
+    reopenedLens.pumpFrames (2);
+
+    const auto faltante = reopenedLens.stateText();
     std::printf ("TONAL[estado] no encontrada: \"%s\"\n", faltante.toRawUTF8());
     REQUIRE (faltante.startsWith (say (Key::referenceMissing, "es")));
     REQUIRE (faltante.contains ("tonal_long.wav"));
-    REQUIRE (proc.referenceMissingName() == "tonal_long.wav");
-    REQUIRE_FALSE (proc.reference().read().refValid);
+    REQUIRE (reopened.referenceMissingName() == "tonal_long.wav");
+    REQUIRE_FALSE (reopened.reference().read().refValid);
+    reopened.releaseResources();
 
     proc.releaseResources();
 }

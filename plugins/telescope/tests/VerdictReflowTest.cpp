@@ -314,7 +314,7 @@ TEST_CASE ("telescope: el boton MODO de VERDICT dice el modo entero y entra, en 
     }
     telescope::Lens::setDirectPaintForTest (false);
     std::printf ("MODO total: %d idiomas, %d botones medidos (2 modos x S/M/L x 1/1.25/1.5)\n", langs, checked);
-    CHECK (langs == 6);
+    CHECK (langs == 7);   // Periscope: Russian is the seventh
     CHECK (checked == langs * 2 * 3 * 3);
 
     proc.setVerdictMode (telescope::TelescopeProcessor::verdictLive);

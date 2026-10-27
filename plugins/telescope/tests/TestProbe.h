@@ -67,6 +67,9 @@ private:
             for (juce::juce_wchar c = 32; c < 127; ++c) chars += c;
             chars += juce::String::fromUTF8 ("✓✔○●◆◇▲▼■□±·…–−°×→←↑↓µ√ÁÉÍÓÚáéíóúñÑüÜäöÄÖßàèìòùçÇâêôœ‹›«»"
                                               "ãõÃÕîïûëÀÈÂÊÎÔÛËÏŒ");   // F2b: las tildes de VERDICT (pt, fr)
+            // Periscope: the Cyrillic letters of the Russian UI, so its glyphs decode instead of reading "?".
+            for (juce::juce_wchar c = 0x410; c <= 0x44F; ++c) chars += c;
+            chars += juce::String::fromUTF8 ("Ёё");
             for (int i = 0; i < chars.length(); ++i)
             {
                 juce::GlyphArrangement ga;

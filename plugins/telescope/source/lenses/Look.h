@@ -644,4 +644,10 @@ inline juce::Colour levelZone (float db, float cautionDb = -3.0f, float alertDb 
     if (db >= cautionDb) return caution;
     return dataLine;
 }
+
+// Periscope: the shade over spectrum regions the masking model calls inaudible (darker) or partly masked.
+inline juce::Colour maskShade (bool fullyMasked) noexcept
+{
+    return juce::Colours::black.withAlpha (fullyMasked ? 0.55f : 0.3f);
+}
 }

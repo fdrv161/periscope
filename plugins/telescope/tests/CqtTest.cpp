@@ -504,7 +504,9 @@ TEST_CASE ("telescope: la tonalidad estimada acierta Do mayor y La menor, y duda
         // los casos con tonalidad (0.845 y 0.868), pero no baja de 0.5 — es el piso del máximo-de-24.
         REQUIRE (seis.spread < 6.0);
         REQUIRE (seis.frac < 0.5f);
-        REQUIRE (seis.conf < 0.7f);
+        // Periscope 1.4.0: the centred 40 Hz - 5 kHz chroma lifts this 6 s noise to about 0.75 and the keys to 0.86 and
+        // 0.88; still under both. The time fraction above stays the real tell (33 % against 100 %).
+        REQUIRE (seis.conf < 0.8f);
         // 12 s: con el doble de material la confianza sí se cae por debajo de 0.5, que es lo que prueba
         // que el número de arriba era piso y no señal.
         REQUIRE (doce.conf < 0.5f);

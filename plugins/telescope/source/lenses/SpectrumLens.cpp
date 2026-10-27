@@ -2067,7 +2067,7 @@ void SpectrumLens::paintMasking (juce::Graphics& g) const
         if (maskState[i] == AuditoryMasking::audible) continue;
         const float xa = xForFreq (maskLoHz[i]), xb = xForFreq (maskHiHz[i]);
         if (xb <= xa) continue;
-        g.setColour (juce::Colours::black.withAlpha (maskState[i] == AuditoryMasking::masked ? 0.55f : 0.3f));
+        g.setColour (look::maskShade (maskState[i] == AuditoryMasking::masked));
         g.fillRect (juce::Rectangle<float> (xa, (float) zones.plot.getY(), xb - xa, (float) zones.plot.getHeight()));
     }
     g.restoreState();
