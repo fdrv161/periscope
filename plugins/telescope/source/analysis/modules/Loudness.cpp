@@ -41,6 +41,11 @@ void Loudness::reset()
     relKnown = false;
     stGatedSorted.clear();
     stPower = 0.0;
+    histogramMode = false;   // Periscope: a reset starts exact again
+    blockBinCount.clear();
+    blockBinEnergy.clear();
+    stBinCount.clear();
+    stGatedCount = 0;
     hopTpDb.clear();
     hopTpLin = 0.0f;
     hopTpLinL = hopTpLinR = 0.0f;   // 57c (M-1 del revisor): los acumuladores por canal se limpian como el conjunto
@@ -186,8 +191,7 @@ void Loudness::finishHop()
         current.momentary = toLufs (zSum);
         if (current.momentary > current.momentaryMax) current.momentaryMax = current.momentary;
 
-        blockZ.push_back (zSum);          // éste es el bloque de compuerta del integrado
-        recomputeIntegrated();
+        recomputeIntegrated (zSum);       // éste es el bloque de compuerta del integrado
     }
 
     // SHORT-TERM — ventana de 3 s (30 hops), a 10 Hz.
@@ -230,10 +234,19 @@ void Loudness::finishHop()
 
 // Doble compuerta de BS.1770: absoluta -70 LUFS, después relativa a 10 LU bajo la media de los que pasaron.
 // Periscope: incremental, with the same result bit for bit as summing the whole history (see Loudness.h).
-void Loudness::recomputeIntegrated()
+void Loudness::recomputeIntegrated (double zNew)
 {
-    // The block just pushed: its LUFS once, and the absolute-gated running sum (block order, as before).
-    const double zNew = blockZ.back();
+    // Periscope: past the exact span the history lives in histograms (see the header).
+    if (! histogramMode && (long long) blockZ.size() >= exactBlockLimit)
+        enterHistogramMode();
+    if (histogramMode)
+    {
+        integratedFromHistogram (zNew);
+        return;
+    }
+
+    // The new block: its LUFS once, and the absolute-gated running sum (block order, as before).
+    blockZ.push_back (zNew);
     const float  lNew = toLufs (zNew);
     blockLufs.push_back (lNew);
     const bool newAbs = lNew > kAbsGate;
@@ -303,6 +316,7 @@ void Loudness::recomputeIntegrated()
 // los que quedan (índices redondeados sobre n-1, como el `round((n-1)*PRC/100 + 1)` del MATLAB).
 void Loudness::recomputeLra (float v)
 {
+    if (histogramMode) { lraFromHistogram (v); return; }   // Periscope: see the header
     // Periscope: the absolute-gated values stay sorted and their power runs in arrival order, the same order and
     // the same terms the author's loop summed, so the result is identical bit for bit (see Loudness.h).
     if (v >= (float) kAbsGate)
@@ -324,5 +338,107 @@ void Loudness::recomputeLra (float v)
     const auto lo  = (size_t) std::llround (n * 0.10);
     const auto hi  = (size_t) std::llround (n * 0.95);
     current.lra = first[(std::ptrdiff_t) hi] - first[(std::ptrdiff_t) lo];
+}
+
+//======================================================================= Periscope: after the exact span
+int Loudness::fineBin (double lufs) noexcept
+{
+    return (int) std::clamp<long long> (std::llround ((lufs - kHistLoLufs) * kHistGrain), 0, kHistBinsFine - 1);
+}
+
+// Folds the exact history into the histograms once, then frees it. The running sums of the gates are kept as they
+// are, so the gate levels stay the exact ones.
+void Loudness::enterHistogramMode()
+{
+    histogramMode = true;
+
+    blockBinCount.assign ((size_t) kHistBinsFine, 0);
+    blockBinEnergy.assign ((size_t) kHistBinsFine, 0.0);
+    for (size_t i = 0; i < blockZ.size(); ++i)
+    {
+        if ((double) blockLufs[i] <= kAbsGate) continue;   // the same test as `newAbs` in the exact path
+        const auto b = (size_t) fineBin ((double) blockLufs[i]);
+        ++blockBinCount[b];
+        blockBinEnergy[b] += blockZ[i];
+    }
+
+    stBinCount.assign ((size_t) kHistBinsFine, 0);
+    for (const float v : stGatedSorted) ++stBinCount[(size_t) fineBin ((double) v)];
+    stGatedCount = (long long) stGatedSorted.size();
+
+    // swap with an empty vector, not clear(): clear() keeps the capacity, which is the memory this is for.
+    std::vector<double>().swap (blockZ);
+    std::vector<float>().swap (blockLufs);
+    std::vector<float>().swap (gatedBlockSorted);
+    std::vector<float>().swap (stGatedSorted);
+    relKnown = false;
+}
+
+void Loudness::integratedFromHistogram (double zNew)
+{
+    const float lNew = toLufs (zNew);
+    if (lNew > kAbsGate)
+    {
+        absSum += zNew;
+        ++absCount;
+        const auto b = (size_t) fineBin ((double) lNew);
+        ++blockBinCount[b];
+        blockBinEnergy[b] += zNew;
+    }
+
+    if (absCount == 0)
+    {
+        current.integrated      = kSilenceFloor;
+        current.integratedValid = false;
+        return;
+    }
+
+    // Above the relative gate: the bins whose centre is above it (the first index i with centre(i) > gate).
+    const double relGate = (double) toLufs (absSum / (double) absCount) + kRelGateI;
+    const int first = std::max (0, (int) std::floor ((relGate - kHistLoLufs) * kHistGrain) + 1);
+    double    sum   = 0.0;
+    long long count = 0;
+    for (int i = first; i < kHistBinsFine; ++i)
+    {
+        sum   += blockBinEnergy[(size_t) i];
+        count += blockBinCount[(size_t) i];
+    }
+
+    current.integratedValid = count > 0;
+    current.integrated      = count > 0 ? toLufs (sum / (double) count) : kSilenceFloor;
+}
+
+void Loudness::lraFromHistogram (float v)
+{
+    if (v >= (float) kAbsGate)
+    {
+        stPower += std::pow (10.0, (double) v / 10.0);
+        ++stBinCount[(size_t) fineBin ((double) v)];
+        ++stGatedCount;
+    }
+    if (stGatedCount == 0) { current.lra = 0.0f; return; }
+
+    // The relative gate from the exact running power; the values at or above it are the bins from `first` on.
+    const double gate  = 10.0 * std::log10 (stPower / (double) stGatedCount) + kRelGateLra;
+    const int    first = std::clamp ((int) std::ceil ((gate - kHistLoLufs) * kHistGrain), 0, kHistBinsFine);
+    long long count = 0;
+    for (int i = first; i < kHistBinsFine; ++i) count += stBinCount[(size_t) i];
+    if (count == 0) { current.lra = 0.0f; return; }
+
+    // Same percentile indices as the exact path; the value at a rank is the centre of the bin that holds it.
+    const auto n  = (double) count - 1.0;
+    const auto lo = std::llround (n * 0.10);
+    const auto hi = std::llround (n * 0.95);
+    const auto valueAt = [&] (long long rank)
+    {
+        long long seen = 0;
+        for (int i = first; i < kHistBinsFine; ++i)
+        {
+            seen += stBinCount[(size_t) i];
+            if (seen > rank) return fineCentre (i);
+        }
+        return fineCentre (kHistBinsFine - 1);
+    };
+    current.lra = (float) (valueAt (hi) - valueAt (lo));
 }
 }

@@ -29,6 +29,12 @@
 //
 // MEMORIA: guarda un valor por hop desde el último reset (~2.3 MB por hora entre bloques y short-terms).
 // RESET lo vacía. Es el precio de un integrado EXACTO en vez de por histograma con bins de 0.1 dB.
+//
+// Periscope: only for the first kExactHours after a reset. In Monitor FX nobody resets, and the history grew without
+// end (memory, and a sorted insertion per hop that copied ever more). After that the block and short-term values are
+// folded into histograms of 0.01 LU (as ffmpeg's ebur128 filter measures): constant memory and work. The gates keep
+// using the exact running sums; only which values sit above the relative gate, and the LRA percentiles, go by the
+// bin centre, so integrated and LRA move by less than 0.01 LU. Before the switch everything is bit for bit as before.
 // ========================================================================================================
 namespace telescope
 {
@@ -147,10 +153,25 @@ public:
 
     int hopSamples() const noexcept { return hop; }
 
+    // Periscope: exact history for this many 400 ms blocks after a reset, histograms after (see the header).
+    static constexpr int       kExactHours       = 6;
+    static constexpr long long kExactBlocks      = (long long) kExactHours * 3600 * 10;
+    static constexpr double    kHistLoLufs       = -70.0;   // the absolute gate
+    static constexpr double    kHistGrain        = 100.0;   // bins per LU
+    static constexpr int       kHistBinsFine     = 8001;    // -70 ... +10 LUFS; louder values go to the top bin
+    // Tests only: a short limit, so the switch can be checked without hours of audio. Takes effect at the next block.
+    void setExactHistoryLimit (long long blocks) noexcept { exactBlockLimit = blocks > 0 ? blocks : 1; }
+    bool usesHistogram() const noexcept { return histogramMode; }
+
 private:
     void finishHop();
-    void recomputeIntegrated();
+    void recomputeIntegrated (double zNew);
     void recomputeLra (float newShortTerm);
+    void enterHistogramMode();
+    void integratedFromHistogram (double zNew);
+    void lraFromHistogram (float newShortTerm);
+    static int fineBin (double lufs) noexcept;
+    static double fineCentre (int bin) noexcept { return kHistLoLufs + (double) bin / kHistGrain; }
     void resetClipCount();
 
     static double meanOfLast (const std::deque<double>& d, int count) noexcept;
@@ -192,6 +213,14 @@ private:
     bool      relKnown = false;
     std::vector<float>  stGatedSorted;    // short-term LUFS >= the absolute gate, ascending (for the LRA)
     double    stPower = 0.0;              // Σ 10^(v/10) of those, in arrival order
+
+    // Periscope: the histogram mode after kExactBlocks (empty until then; the exact vectors are freed at the switch).
+    long long exactBlockLimit = kExactBlocks;
+    bool      histogramMode = false;
+    std::vector<long long> blockBinCount;   // gated blocks per 0.01 LU bin
+    std::vector<double>    blockBinEnergy;  // Σ z of those blocks (the real energies, not the bin centre's)
+    std::vector<long long> stBinCount;      // short-term values >= the absolute gate per bin
+    long long              stGatedCount = 0;
 
     // ---- DYNAMICS ----
     float              hopTpLin = 0.0f;      // |y| máximo del hop en curso (lineal, antes del K-weighting)
