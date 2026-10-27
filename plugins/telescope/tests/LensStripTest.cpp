@@ -7,6 +7,8 @@
 // su texto y su caja. Y se compara contra el nombre que la fila TIENE que decir (strings::get), no contra una
 // elipsis: así también se ve un recorte silencioso, el de `drawText (…, false)`, que pierde glifos sin avisar.
 #include <catch2/catch_test_macros.hpp>
+#include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <memory>
 #include <vector>
@@ -68,18 +70,25 @@ TEST_CASE ("telescope: los nombres de la tira entran enteros en los seis idiomas
                 const auto expected = telescope::strings::get (telescope::LensStrip::keyFor (i), lang);
 
                 juce::String shown;
-                int lines = 0;
                 bool outside = false, ellipsis = false;
+                // Periscope: lines are counted by their height on screen, not by glyph runs. A Russian name is drawn
+                // in several runs on one line (the letters come from a fallback font, spaces and hyphens from the
+                // strip font), which a run count took for five lines.
+                std::vector<float> lineYs;
                 for (const auto& run : runs)
                 {
                     if (! rowBox.contains (run.box.getCentre())) continue;
-                    ++lines;
+                    const float cy = run.box.getCentreY();
+                    if (std::none_of (lineYs.begin(), lineYs.end(),
+                                      [&] (float y) { return std::abs (y - cy) < 0.5f * run.box.getHeight(); }))
+                        lineYs.push_back (cy);
                     shown << run.text;
                     ellipsis = ellipsis || run.text.contains (juce::String::fromUTF8 ("\xe2\x80\xa6")) || run.text.endsWith ("...");
                     // La caja del texto dentro de su fila (medio píxel de tolerancia por el suavizado).
                     outside = outside || run.box.getX() < rowBox.getX() - 0.5f || run.box.getRight() > rowBox.getRight() + 0.5f
                                       || run.box.getY() < rowBox.getY() - 0.5f || run.box.getBottom() > rowBox.getBottom() + 0.5f;
                 }
+                const int lines = (int) lineYs.size();
 
                 const bool whole = withoutSpaces (shown) == withoutSpaces (expected);
                 ++rows;
