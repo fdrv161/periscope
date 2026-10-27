@@ -3,7 +3,7 @@
 # _probe que las usa todas. Ver CONTRACT.md (§"Cómo S5 integra") y docs/plans/S5-integracion.md.
 #
 # Qué hace:
-#   1. Pinea JUCE 8.0.13 (reusa un checkout local con -DOVNI_JUCE_DIR=... ; si no, FetchContent del tag).
+#   1. Pinea JUCE 8.0.16-security (reusa un checkout local con -DOVNI_JUCE_DIR=... ; si no, FetchContent del tag).
 #   2. Provee libmysofa v1.3.4 (target mysofa-static) para ovni_dsp/SofaLoader  [OVNI_WITH_SOFA, default ON].
 #   3. add_subdirectory de cada lib del sello: ovni_data / ovni_dsp / ovni_movement / ovni_uikit / ovni_presets.
 #   4. Agrega shared/ a los include dirs (convención del CONTRACT: #include "engines/...", "ui-kit/...", etc.).
@@ -70,17 +70,17 @@ option(OVNI_COPY_PLUGIN_AFTER_BUILD "Copiar los plugins a las carpetas de plug-i
 include(FetchContent)
 
 # ---------------------------------------------------------------------------------------------
-# 1. JUCE 8.0.13 — reusa OVNI_JUCE_DIR si apunta a un checkout válido; si no, clona el tag.
+# 1. JUCE 8.0.16-security — reusa OVNI_JUCE_DIR si apunta a un checkout válido; si no, clona el tag.
 # ---------------------------------------------------------------------------------------------
-set(OVNI_JUCE_DIR "" CACHE PATH "Checkout local de JUCE 8.0.13 a reusar (evita el clone)")
+set(OVNI_JUCE_DIR "" CACHE PATH "Checkout local de JUCE 8.0.16-security a reusar (evita el clone)")
 if (OVNI_JUCE_DIR AND EXISTS "${OVNI_JUCE_DIR}/CMakeLists.txt")
     message(STATUS "[ovni] Reusando JUCE de ${OVNI_JUCE_DIR}")
     add_subdirectory("${OVNI_JUCE_DIR}" "${CMAKE_BINARY_DIR}/_juce")
 else ()
-    message(STATUS "[ovni] FetchContent JUCE 8.0.13")
+    message(STATUS "[ovni] FetchContent JUCE 8.0.16-security")
     FetchContent_Declare(JUCE
         GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
-        GIT_TAG 8.0.13
+        GIT_TAG 8.0.16-security
         GIT_SHALLOW TRUE)
     FetchContent_MakeAvailable(JUCE)
 endif ()

@@ -1,5 +1,5 @@
 # Periscope: backport of JUCE commit "Accessibility (Windows): Guard UiaDisconnectAllProviders so that it is only
-# called in standalone apps" (develop, 2026-07-24), which JUCE 8.0.13 does not have. Part 3 below backports a second
+# called in standalone apps" (develop, 2026-07-24), which JUCE 8.0.13 to 8.0.16-security do not have. Part 3 below backports a second
 # Windows accessibility fix of the same kind.
 #
 # Why: when the last plugin instance unloads, JUCE's ~WindowsUIAWrapper calls UiaDisconnectAllProviders. That cuts
@@ -8,7 +8,7 @@
 # Each of our providers is still disconnected one by one when its component goes away.
 #
 # The edit is made in the fetched JUCE sources at configure time, is idempotent (a cached, already patched checkout
-# is left alone) and stops the configure if the code no longer looks like 8.0.13, so it can never silently not apply.
+# is left alone) and stops the configure if the code no longer looks like 8.0.13-8.0.16, so it can never silently not apply.
 function (ovni_patch_juce_uia juce_dir)
     set(native "${juce_dir}/modules/juce_gui_basics/native/accessibility")
 
@@ -48,7 +48,7 @@ function (ovni_patch_juce_uia juce_dir)
     # and get_ProviderOptions used the handler without checking it first: an access violation that takes REAPER down.
     set(element "${native}/juce_AccessibilityElement_windows.cpp")
     file(READ "${element}" text)
-    # One line only, in 8.0.13 the only place with exactly this text: a match across lines would depend on the line
+    # One line only, in 8.0.13 and 8.0.16 the only place with exactly this text: a match across lines would depend on the line
     # endings git gives the checkout.
     set(old "if (AccessibilityHandler::getNativeChildForComponent (accessibilityHandler.getComponent()) != nullptr)")
     set(fixed "if (isElementValid() && AccessibilityHandler::getNativeChildForComponent (accessibilityHandler.getComponent()) != nullptr)")

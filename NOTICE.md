@@ -17,7 +17,7 @@ no se puede comprobar, es un bug — abrí un issue.
 
 ## Decisión de licencia — resuelta
 
-**JUCE 8.0.13 (la versión que este repo pinea) en su edición gratuita es AGPLv3**
+**JUCE 8.0.16-security (la versión que este repo pinea) en su edición gratuita es AGPLv3**
 (GNU Affero GPL v3) o licencia comercial. Lo dice el propio `LICENSE.md` del checkout
 de JUCE 8: *"The JUCE Framework modules are dual-licensed under the AGPLv3 and the
 commercial JUCE licence."*
@@ -44,7 +44,7 @@ por red), pero las cumplimos al publicar el código completo del repo en el rele
 
 ### JUCE
 - **Origen / autor:** Raw Material Software Ltd. — <https://juce.com>
-- **Versión:** 8.0.13 (pineada en `CMakeLists.txt`)
+- **Versión:** 8.0.16-security (pineada en `CMakeLists.txt`)
 - **Licencia:** edición gratuita **AGPLv3** + licencia comercial (dual). El catálogo OVNI
   sale bajo AGPLv3 (ver "Decisión de licencia — resuelta" arriba).
 - **Uso en el proyecto:** framework de audio/UI de todos los plugins del chasis
@@ -169,7 +169,7 @@ viaja adentro de TELESCOPE.
 
 ### Software que TELESCOPE incorpora
 
-- **JUCE 8.0.13** — AGPLv3 (edición gratuita). Framework de audio/UI: `juce_audio_utils`,
+- **JUCE 8.0.16-security** — AGPLv3 (edición gratuita). Framework de audio/UI: `juce_audio_utils`,
   `juce_dsp`, `juce_gui_basics`, `juce_audio_processors`. Ver la sección "JUCE" arriba.
 - **Catch2 v3.8.1** — BSL-1.0. **Sólo** al compilar `OvniTelescopeTests`; **no** se enlaza en el
   VST3/AU/Standalone que se publican.

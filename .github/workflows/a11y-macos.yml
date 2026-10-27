@@ -33,9 +33,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: build/_deps
-          key: deps-macos-${{ github.event.repository.name }}-${{ hashFiles('CMakeLists.txt') }}
+          key: deps-macos-juce8016-${{ github.event.repository.name }}-${{ hashFiles('CMakeLists.txt') }}
           restore-keys: |
-            deps-macos-${{ github.event.repository.name }}-
+            deps-macos-juce8016-${{ github.event.repository.name }}-
 
       # Copying into ~/Library after the build is off: the runner only needs the bundles.
       - name: Configure

@@ -29,9 +29,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: build/_deps
-          key: deps-windows-${{ github.event.repository.name }}-${{ hashFiles('CMakeLists.txt') }}
+          key: deps-windows-juce8016-${{ github.event.repository.name }}-${{ hashFiles('CMakeLists.txt') }}
           restore-keys: |
-            deps-windows-${{ github.event.repository.name }}-
+            deps-windows-juce8016-${{ github.event.repository.name }}-
 
       - name: Configure
         run: >
@@ -99,9 +99,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: build/_deps
-          key: deps-macos-${{ github.event.repository.name }}-${{ hashFiles('CMakeLists.txt') }}
+          key: deps-macos-juce8016-${{ github.event.repository.name }}-${{ hashFiles('CMakeLists.txt') }}
           restore-keys: |
-            deps-macos-${{ github.event.repository.name }}-
+            deps-macos-juce8016-${{ github.event.repository.name }}-
 
       - name: Configure
         run: >

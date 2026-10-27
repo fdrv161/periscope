@@ -34,9 +34,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: build/_deps
-          key: deps-windows-${{ github.event.repository.name }}-${{ hashFiles('CMakeLists.txt') }}
+          key: deps-windows-juce8016-${{ github.event.repository.name }}-${{ hashFiles('CMakeLists.txt') }}
           restore-keys: |
-            deps-windows-${{ github.event.repository.name }}-
+            deps-windows-juce8016-${{ github.event.repository.name }}-
 
       # Tests and libmysofa are off, as in the main ci.yml: TELESCOPE does not need them to build the plugin.
       - name: Configure
