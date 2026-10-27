@@ -1,0 +1,3 @@
+# Periscope: the golden dumps are compared byte for byte (GoldenAnalysisTest.cpp), so a Windows checkout must not
+# turn their LF line endings into CRLF.
+plugins/telescope/tests/golden/*.txt text eol=lf
