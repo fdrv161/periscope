@@ -20,6 +20,12 @@ Install on Windows: extract the ZIP and copy the `Periscope.vst3` folder into `C
 
 Also in [Russian (Русский)](MANUAL.ru.md) and [Spanish (Español)](MANUAL.es.md). The English manual is the main version; the translations are updated together with it.
 
+## What's new in 1.4.2
+
+- More stable when left running for days, for example in REAPER's Monitoring FX: memory no longer grows, and a broken plugin earlier in the chain can no longer freeze the readings.
+- Fixed a possible REAPER crash with NVDA running.
+- Periscope never changes the sound passing through it.
+
 ## What's new in 1.4.1
 
 - Fixed: removing Periscope with NVDA running stalled REAPER and could leave REAPER and other plugins without screen reader access (a JUCE issue, fixed the same way JUCE fixed it).
